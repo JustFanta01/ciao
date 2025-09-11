@@ -12,10 +12,12 @@ seed = 42
 np.random.seed(seed)
 
 # [ global parameters ]
-max_iter = 200
+max_iter = 350
 
 def cost_fn(zz_i, z_bar, alpha, beta, energy_tx, energy_task, time_task, time_rtt):
     def _rtt(z_bar): # round-trip time, increasing in z_bar
+        # T = time_rtt * np.eye(zz_i.shape[0])
+        # T @ z_bar
         return time_rtt * z_bar
     
     def _cost_function_cloud(z_bar):
@@ -35,6 +37,7 @@ def cost_fn(zz_i, z_bar, alpha, beta, energy_tx, energy_task, time_task, time_rt
     """
     local = _cost_function_local()
     cloud = _cost_function_cloud(z_bar)
+    # cost = (1 - zz_i).T @ local + zz_i.T @ cloud
     cost = (1 - zz_i) * local + zz_i * cloud
     
     return cost
@@ -44,13 +47,16 @@ def gradient_computation(zz_i, avg_offload_ratio, constants, N, type):
     if type == 'first':
         # Thus, the gradient of the cost function $$ J_i(z_i, \bar{z}) $$ with respect to $$ z_i $$ is:
         
-        # $$ \frac{\partial J_i}{\partial z_i} = - (e_i^{task} + t_i^{task}) + \alpha t \bar{z} + \beta e_i^{tx} + \frac{\alpha \cdot t}{N}z_i $$
-    
-        grad = -(energy_task + time_task) + alpha * time_rtt * avg_offload_ratio + beta * energy_tx + (alpha * time_rtt * zz_i)/N
+        # \nabla_1 J_i (z_i, \bar{z})= - (e_i^{task} + t_i^{task}) + \alpha t \bar{z} + \beta e_i^{tx} + \frac{\alpha \cdot t}{N}z_i
+        
+        # $$ \nabla_1 J_i (z_i, \bar{z})= - (e_i^{task} + t_i^{task}) + \alpha t \bar{z} + \beta e_i^{tx} $$
+        grad =  -(energy_task + time_task) \
+                + alpha * time_rtt * avg_offload_ratio \
+                + beta * energy_tx \
+                # + (alpha * time_rtt * zz_i)/N             # no chain rule term
 
     elif type == 'second':
-        
-        # $$ \frac{\partial J_i}{\partial z_i} = z_i \cdot \alpha \cdot t  $$
+        # $$ \nabla_2 J_i (z_i, \bar{z}) = z_i \cdot \alpha \cdot t  $$
         
         grad = zz_i * alpha * time_rtt
     else:
@@ -141,6 +147,8 @@ def aggregative_tracking(stepsize, z_init, dim, cost_functions, alpha, beta, tim
                 
             # [ ss update ]
             ss_consensus = ss[k].T @ adj[i].T
+            print(f"ss[k].shape: {ss[k].shape}")
+            print(f"ss[k].T.shape: {ss[k].T.shape}")
             ss_local_innovation = zz[k+1, i] - zz[k, i] # $$\phi(z_i^{k+1}) - \phi(z_i^{k})$$
             ss[k+1, i] = ss_consensus + ss_local_innovation
 
@@ -154,34 +162,107 @@ def aggregative_tracking(stepsize, z_init, dim, cost_functions, alpha, beta, tim
     return total_cost, total_grad, zz, ss, vv
 
 
-def animate_offloading(zz, interval=100):
+def animate_offloading(
+    zz,
+    energy_task, time_task, energy_tx, time_rtt,
+    interval=100
+):
     """
-    Crea un'animazione dei valori z_i per tutti gli agenti e la media.
-    zz ha shape (max_iter, N, d).
-    """
-    max_iter, N, d = zz.shape
-    fig, ax = plt.subplots(figsize=(8, 5))
+    Animate the evolution of offloading ratios z_i and the mean bar{z}.
 
-    # Inizializzazione delle barre
-    values = np.append(zz[0,:,0], np.mean(zz[0,:,0]))
-    bars = ax.bar(range(N+1), values, tick_label=[f"Agente {i+1}" for i in range(N)] + ["Media"])
+    Parameters
+    ----------
+    zz : ndarray, shape (K, N, d)
+        Trajectory: zz[k, i, 0] = offloading ratio of agent i at iteration k.
+    energy_task, time_task, energy_tx, time_rtt : array-like of length N
+        Constant parameters per agent, displayed in x-axis labels.
+    interval : int
+        Delay (ms) between frames.
+    """
+    K, N, d = zz.shape
+    assert d == 1, "This visualizer assumes d=1."
+
+    # Precompute the mean trajectory
+    zbar = np.mean(zz[:, :, 0], axis=1)  # shape (K,)
+
+    # ----- Figure with 2 subplots: bars (left), mean line (right)
+    fig, (ax_bar, ax_line) = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={'width_ratios': [2, 3]})
+
+    # Build labels with constants
+    def build_labels():
+        labels = []
+        for i in range(N):
+            labels.append(
+                f"Agent {i+1}\n"
+                f"E_task={energy_task[i]}\n"
+                f"T_task={time_task[i]}\n"
+                f"E_tx={energy_tx[i]}\n"
+                f"RTT={time_rtt[i]}"
+            )
+        labels.append("Mean")
+        return labels
+
+    labels = build_labels()
+
+    # ---------- init: bars subplot ----------
+    x = np.arange(N + 1)
+    values0 = np.append(zz[0, :, 0], zbar[0])
+    bars = ax_bar.bar(x, values0, tick_label=labels)
     bars[-1].set_color("orange")
 
-    ax.set_ylim(0, 1.2)
-    ax.set_ylabel("z_i")
-    ax.set_title("Evoluzione degli offloading ratio")
+    # add numeric annotations
+    ann = []
+    for b in bars:
+        h = b.get_height()
+        ann.append(ax_bar.text(b.get_x() + b.get_width()/2., h + 0.02, f"{h:.2f}",
+                               ha='center', va='bottom', fontsize=8))
 
+    ax_bar.set_ylim(0, 1.2)
+    ax_bar.set_ylabel("Offloading ratio z_i")
+    ax_bar.set_title("Offloading ratios per agent (+ mean)")
+
+    # ---------- init: mean trajectory subplot ----------
+    line, = ax_line.plot([], [], lw=2)
+    ax_line.set_xlim(0, K-1)
+    ax_line.set_ylim(0, 1.05)  # mean stays in [0,1]
+    ax_line.set_xlabel("Iteration k")
+    ax_line.set_ylabel("Mean offloading ratio ȳ(k)")
+    ax_line.set_title("Mean offloading ratio over time")
+    # also draw a marker for current frame
+    current_pt, = ax_line.plot([], [], marker='o')
+
+    # ---------- update function ----------
     def update(frame):
-        ax.clear()
-        values = np.append(zz[frame,:,0], np.mean(zz[frame,:,0]))
-        bars = ax.bar(range(N+1), values, tick_label=[f"Agente {i+1}" for i in range(N)] + ["Media"])
+        # ---- bars
+        values = np.append(zz[frame, :, 0], zbar[frame])
+        ax_bar.clear()
+        bars = ax_bar.bar(x, values, tick_label=labels)
         bars[-1].set_color("orange")
-        ax.set_ylim(0, 1.2)
-        ax.set_ylabel("z_i")
-        ax.set_title(f"Iterazione {frame}")
-        return bars
+        ax_bar.set_ylim(0, 1.2)
+        ax_bar.set_ylabel("Offloading ratio z_i")
+        ax_bar.set_title(f"Offloading ratios — Iteration {frame}")
 
-    ani = animation.FuncAnimation(fig, update, frames=max_iter, interval=interval, blit=False, repeat=False)
+        # re-create annotations
+        for txt in ax_bar.texts:
+            txt.remove()
+        for bar in bars:
+            h = bar.get_height()
+            ax_bar.text(bar.get_x() + bar.get_width()/2., h + 0.02, f"{h:.2f}",
+                        ha='center', va='bottom', fontsize=8)
+
+        # ---- mean line
+        line.set_data(np.arange(frame+1), zbar[:frame+1])
+        current_pt.set_data([frame], [zbar[frame]])
+        ax_line.set_xlim(0, K-1)  # keep fixed
+        # (no need to clear ax_line; just update artists)
+
+        # returns an iterable of artists
+        return bars + (line, current_pt)
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=K, interval=interval, blit=False, repeat=False
+    )
+    plt.tight_layout()
     plt.show()
 
 
@@ -193,15 +274,21 @@ def main():
     z_init = np.random.uniform(low=0, high=1, size=(N, d))
 
     args = {'edge_probability': 0.65, 'seed': seed}
-    graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
+    graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.COMPLETE, args)
 
-    # define ell_i
+    # [ define ell_i ]
+    # local cost:
+    energy_task = np.ones(N) * 4
+    # energy_task[-1] += 1            # last agent should prefer cloud [TO ZERO]
+    energy_task[-1] += 2            # last agent should prefer cloud [NOT TO ZERO]
+    time_task = np.ones(N) * 4
+    
+    # cloud access cost:
     alpha = np.ones(N)
     beta = np.ones(N)
-    energy_task = np.ones(N) * 4    # local
-    time_task = np.ones(N) * 3      # local
-    energy_tx = np.ones(N) * 3      # cloud
-    time_rtt = np.ones(N) * 2       # cloud
+    energy_tx = np.ones(N) * 4      # cloud
+    time_rtt = np.ones(N) * 4       # cloud
+    energy_tx[0] += 1               # first agent should prefer local
 
     cost_functions = []
     for i in range(N):
@@ -222,8 +309,8 @@ def main():
     (total_cost_distr, total_grad_distr, zz_distr, ss_distr, vv_distr) = res
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!
-    sbar_bias = np.linalg.norm(np.mean(ss_distr[-1, :, 0]) - np.mean(zz_distr[-1, :, 0]))
-    print(f"[CHECK] s-tracker bias on zbar: {sbar_bias:.3e}")
+    # sbar_bias = np.linalg.norm(np.mean(ss_distr[-1, :, 0]) - np.mean(zz_distr[-1, :, 0]))
+    # print(f"[CHECK] s-tracker bias on zbar: {sbar_bias:.3e}")
 
     fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
     title = f"Graph and Adj Matrix"
@@ -245,8 +332,8 @@ def main():
 
     plot_utils.show_and_wait(fig)
 
-    animate_offloading(zz_centr)
-    animate_offloading(zz_distr)
+    animate_offloading(zz_centr, energy_task, time_task, energy_tx, time_rtt)
+    animate_offloading(zz_distr, energy_task, time_task, energy_tx, time_rtt)
 
 
 if __name__ == "__main__":
