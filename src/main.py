@@ -4,11 +4,11 @@ import sys
 import os
 
 from models.algorithm_interface import RunResult
-from algorithms.centralized import CentralizedGradientMethod 
-from algorithms.distributed import DistributedAggregativeTracking
+from algorithms.aggregative_tracking.centralized import CentralizedGradientMethod
+from algorithms.aggregative_tracking.distributed import DistributedAggregativeTracking
 from models.phi import IdentityFunction
 from models.optimization_problem import OptimizationProblem
-from models.cost import LocalCloudTradeoffCostFunction
+from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
 from viz import plots, animation
 
@@ -19,7 +19,7 @@ from utils import graph_utils
 def main():
     N = 5  # number of agents
     d = 1  # dimension of the state space
-    seed = 1
+    seed = 3
     rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
@@ -44,6 +44,8 @@ def main():
                 alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
             )
             cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            # cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
+            # cost_fn = QuadraticCostFunction(cost_params)
             phi_fn = IdentityFunction(d)
             # init_state = rng.uniform(0, 1, size=d)
             agent_i = Agent(i, cost_fn, phi_fn, init_state[i])
@@ -51,7 +53,7 @@ def main():
             agents.append(agent_i)
 
         args = {'edge_probability': 0.65, 'seed': seed}
-        graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
+        graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.COMPLETE, args)
     
         # fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
         # title = f"Graph and Adj Matrix"
@@ -63,18 +65,16 @@ def main():
         problem = OptimizationProblem(agents, adj, seed)
         return problem
 
-    
-    
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    problem = setup_problem()
-    centralized = CentralizedGradientMethod(problem)
-    algo_params = CentralizedGradientMethod.AlgorithmParams(max_iter=350, stepsize=0.01, seed=seed)
-    result = centralized.run(algo_params)
+    # problem = setup_problem()
+    # centralized = CentralizedGradientMethod(problem)
+    # algo_params = CentralizedGradientMethod.AlgorithmParams(max_iter=500, stepsize=0.01, seed=seed)
+    # result = centralized.run(algo_params)
 
-    plotter = plots.RunResultPlotter(result, semilogy=True)
-    plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
+    # plotter = plots.RunResultPlotter(result, semilogy=True)
+    # plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # -----------------------
@@ -82,7 +82,7 @@ def main():
     # -----------------------
     problem = setup_problem()
     distributed = DistributedAggregativeTracking(problem)
-    algo_params = DistributedAggregativeTracking.AlgorithmParams(max_iter=650, stepsize=0.01, seed=seed)
+    algo_params = DistributedAggregativeTracking.AlgorithmParams(max_iter=500, stepsize=0.01, seed=seed)
     result = distributed.run(algo_params)
 
     plotter = plots.RunResultPlotter(result, semilogy=True)

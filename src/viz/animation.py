@@ -28,7 +28,7 @@ def animate_offloading_with_mean(result, agents, interval=100):
     # labels from agents' params
     labels = []
     for i, ag in enumerate(agents):
-        p = ag.cost_params()
+        p = ag.get_cost_params()
         labels.append(
             f"Agent {i+1}\n"
             f"E_task={p.energy_task}\n"

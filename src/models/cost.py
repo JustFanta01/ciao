@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import numpy as np
+
 class CostFunction(ABC):
     @dataclass
     class CostParams(ABC):
@@ -15,9 +17,33 @@ class CostFunction(ABC):
     @abstractmethod
     def nabla_2(zz_i, sigma): ...
 
+class QuadraticCostFunction(CostFunction):
+    """
+    Simple quadratic cost function:
+
+        $$ \ell_i(z_i, \sigma(\textbf{z})) = \frac{1}{2} * ||z_i||^2 + \frac{1}{2} * ||\sigma(\textbf{z}) - c||^2 $$
+    """
+
+    @dataclass
+    class CostParams(CostFunction.CostParams):
+        cc : float
+
+    def __init__(self, cost_params: CostParams):
+        super().__init__()
+        self.cost_params = cost_params
+
+    def cost_fn(self, zz_i: np.ndarray, sigma: np.ndarray) -> float:
+        return 0.5 * np.dot(zz_i, zz_i) + 0.5 * np.dot(sigma - self.cost_params.cc, sigma - self.cost_params.cc)
+
+    def nabla_1(self, zz_i: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+        return zz_i
+
+    def nabla_2(self, zz_i: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+        return sigma - self.cost_params.cc
+
 class LocalCloudTradeoffCostFunction(CostFunction):
     @dataclass
-    class CostParams():
+    class CostParams(CostFunction.CostParams):
         alpha : float
         beta : float
         energy_tx : float

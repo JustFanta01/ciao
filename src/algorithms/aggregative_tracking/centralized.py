@@ -1,5 +1,5 @@
-from models.algorithm_interface import RunResult, OptimizationProblem, Algorithm, TrajectoryCollector
 import numpy as np
+from models.algorithm_interface import RunResult, OptimizationProblem, Algorithm, TrajectoryCollector
 
 class CentralizedGradientMethod(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
@@ -23,7 +23,7 @@ class CentralizedGradientMethod(Algorithm):
         collector_grad = TrajectoryCollector("grad", max_iter, d)
         collector_sigma = TrajectoryCollector("sigma", max_iter, d)
     
-        for k in range(max_iter): # TODO: perche c'era un -1?
+        for k in range(max_iter):
             sigma = self.problem.sigma()
             cost = self.problem.centralized_cost_fn()
             total_grad = np.zeros(d)
@@ -32,16 +32,16 @@ class CentralizedGradientMethod(Algorithm):
                 gradient_sum = np.zeros(d)
 
                 for agent_j in self.problem.agents:
-                    gradient_sum += agent_j.nabla_2(sigma)
+                    gradient_sum += agent_j.nabla_2(agent_j["zz"] , sigma)
 
                 # [ compute gradients ]
-                nabla_1 = agent_i.nabla_1(sigma)
-                nabla_phi = agent_i.nabla_phi()
+                nabla_1 = agent_i.nabla_1(agent_i["zz"], sigma)
+                nabla_phi = agent_i.nabla_phi(agent_i["zz"])
                 grad_i = nabla_1 + 1/N * nabla_phi @ gradient_sum
                 
                 # [ update zz_i ]
-                agent_i.zz = agent_i.zz - stepsize * grad_i
-                agent_i.zz = np.clip(agent_i.zz, 0, 1)   # vincolo [0,1]
+                agent_i["zz"] = agent_i["zz"] - stepsize * grad_i
+                agent_i["zz"] = np.clip(agent_i["zz"], 0, 1)   # vincolo [0,1]
                 
                 total_grad += grad_i
 

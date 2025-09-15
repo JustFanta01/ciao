@@ -13,7 +13,7 @@ class AggregationContributionFunction(ABC):
         ...
     
     @abstractmethod
-    def nabla(self):
+    def nabla(self, zz):
         ...
 
 class IdentityFunction(AggregationContributionFunction):
@@ -26,5 +26,5 @@ class IdentityFunction(AggregationContributionFunction):
     def eval(self, zz):
         return zz
     
-    def nabla(self):
+    def nabla(self, zz):
         return np.eye(self.d)
