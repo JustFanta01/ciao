@@ -43,7 +43,7 @@ class DistributedAggregativeTracking(Algorithm):
             total_cost = 0
             total_grad = np.zeros(d)
 
-            # updated state variables $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1} $$
+            # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1} $$
             zz_k_plus_1 = np.zeros((N,) + d)
             ss_k_plus_1 = np.zeros((N,) + d)
             vv_k_plus_1 = np.zeros((N,) + d)

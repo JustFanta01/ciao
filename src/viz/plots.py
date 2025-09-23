@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.pyplot as plt
 
-class RunResultPlotter:
-    def __init__(self, result, semilogy=False):
+class BaseRunResultPlotter:
+    def __init__(self, result):
         """
         Parameters
         ----------
@@ -16,15 +16,14 @@ class RunResultPlotter:
             If True, use log scale for y-axis in cost and gradient plots.
         """
         self.result = result
-        self.semilogy = semilogy
         self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 8))
         self.fig.tight_layout(pad=4.0)
 
-    def plot_cost(self):
+    def plot_cost(self, semilogy=True):
         cost = self.result.cost_traj
         K = len(cost)
         ax = self.axes[0, 0]
-        if self.semilogy:
+        if semilogy:
             ax.semilogy(np.arange(K), np.abs(cost), label="Cost")
         else:
             ax.plot(np.arange(K), cost, label="Cost")
@@ -35,12 +34,12 @@ class RunResultPlotter:
         ax.legend()
         return self
 
-    def plot_grad_norm(self):
+    def plot_grad_norm(self, semilogy=True):
         grad = self.result.grad_traj
         grad_norm = np.linalg.norm(grad, axis=1)
         K = grad_norm.shape[0]
         ax = self.axes[0, 1]
-        if self.semilogy:
+        if semilogy:
             ax.semilogy(np.arange(K), grad_norm, label="||Grad||")
         else:
             ax.plot(np.arange(K), grad_norm, label="||Grad||")
@@ -51,7 +50,7 @@ class RunResultPlotter:
         ax.legend()
         return self
 
-    def plot_agents_trajectories(self):
+    def plot_agents_trajectories(self, semilogy=True):
         zz = self.result.zz_traj  # (K, N, d)
         K, N, d = zz.shape
         ax = self.axes[1, 0]
@@ -68,7 +67,7 @@ class RunResultPlotter:
         ax.legend()
         return self
 
-    def plot_sigma_trajectory(self):
+    def plot_sigma_trajectory(self, semilogy=True):
         if "sigma_traj" not in self.result.aux:
             ax = self.axes[1, 1]
             ax.set_title("Sigma trajectory (missing in aux)")
@@ -78,7 +77,7 @@ class RunResultPlotter:
             K, d = sigma.shape
             ax = self.axes[1, 1]
             for j in range(d):
-                if self.semilogy:
+                if semilogy:
                     ax.semilogy(np.arange(K), sigma[:, j], label=f"dim {j}")
                 else:
                     ax.plot(np.arange(K), sigma[:, j], label=f"dim {j}")
@@ -107,6 +106,121 @@ class RunResultPlotter:
     def show(self):
         plt.show()
 
+
+class ConstrainedRunResultPlotter(BaseRunResultPlotter):    
+    def __init__(self, result):
+        # TODO: do not call init for not having 2 figs... ?!?!
+        self.result = result
+        self.fig, self.axes = plt.subplots(3, 3, figsize=(12, 8))
+        self.fig.tight_layout(pad=4.0)
+
+    def plot_Lagr_stationarity(self, semilogy=True):
+        """
+        Plot the norms of grad L wrt x and grad L wrt lambda.
+        Requires that result.aux contains 'grad_L_x_traj' and 'grad_L_l_traj'.
+        """
+        ax = self.axes[2, 0]
+        if "grad_L_x_traj" not in self.result.aux or "grad_L_l_traj" not in self.result.aux:
+            ax.set_title("Stationarity (missing in aux)")
+            return self
+
+        grad_L_x = self.result.aux["grad_L_x_traj"]  # shape (K, n_tot)
+        grad_L_l = self.result.aux["grad_L_l_traj"]  # shape (K, m)
+
+        K = grad_L_x.shape[0]
+        norm_x = np.linalg.norm(grad_L_x, axis=1)
+        norm_l = np.linalg.norm(grad_L_l, axis=1)
+
+        if semilogy:
+            ax.semilogy(np.arange(K), norm_x, label="||∇_x L(x,λ||")
+            ax.semilogy(np.arange(K), norm_l, label="||∇_λ L(x,λ)||")
+        else:
+            ax.plot(np.arange(K), norm_x, label="||∇_x L(x,λ)||")
+            ax.plot(np.arange(K), norm_l, label="||∇_λ L(x,λ)||")
+
+        ax.set_title("Norm of ∇1 and ∇2 of L(x,λ)")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Norm")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+
+        return self
+
+    def plot_lambda(self, semilogy=True):
+        ax = self.axes[0, 2]
+        if "lambda_traj" not in self.result.aux:
+            ax.set_title("Lambda trajectory (missing in aux)")
+            return self
+        lamda = self.result.aux["lambda_traj"]
+        K, m = lamda.shape
+        
+        for j in range(m):
+            if semilogy:
+                ax.semilogy(np.arange(K), lamda[:, j], label=f"dim {j}")
+            else:
+                ax.plot(np.arange(K), lamda[:, j], label=f"dim {j}")
+        
+        ax.set_title("Lambda evolution")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Lambda")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+
+        return self
+
+    def plot_kkt_conditions(self, semilogy=True):
+        """
+        Plot the three KKT residuals over iterations:
+        - Stationarity: ||∇f(x) + A^T λ||
+        - Primal violation: ||(Ax - b)_+||_∞
+        - Complementarity: max |λ_j * r_j|
+        """
+        ax = self.axes[2, 2]
+        if "kkt_traj" not in self.result.aux:
+            ax.set_title("KKT conditions (missing in aux)")
+            return self
+
+        kkt = self.result.aux["kkt_traj"]  # shape (K, 3)
+        K = kkt.shape[0]
+
+        labels = ["Stationarity", "Primal violation", "Complementarity"]
+
+        for i in range(3):
+            if semilogy:
+                ax.semilogy(np.arange(K), kkt[:, i], label=labels[i])
+            else:
+                ax.plot(np.arange(K), kkt[:, i], label=labels[i])
+
+        ax.set_title("KKT conditions")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Residuals")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+        return self
+
+    # def plot_KKT_stationarity(self, semilogy=True):
+    #     ax = self.axes[1, 2]
+    #     if "KKT_stationarity" not in self.result.aux:
+    #         ax.set_title("KKT-stationarity trajectory (missing in aux)")
+    #         return self
+    #     KKT_stationarity = self.result.aux["KKT_stationarity"]
+    #     K, n_tot = KKT_stationarity.shape
+        
+    #     K = KKT_stationarity.shape[0]
+    #     norm = np.linalg.norm(KKT_stationarity, axis=1)
+
+    #     if semilogy:
+    #         ax.semilogy(np.arange(K), norm, label="")
+    #     else:
+    #         ax.plot(np.arange(K), norm, label="||∇f(x) + sum λ_i * ∇h_i(x)||")
+
+    #     ax.set_title("KKT stationarity condition")
+    #     ax.set_xlabel("Iteration")
+    #     ax.set_ylabel("Norm")
+    #     ax.grid(True, which="both", ls="--", alpha=0.6)
+    #     ax.legend()
+
+    #     return self
 
 # ---------------- Graph visualization ----------------
 def show_graph_and_adj_matrix(fig, axs, graph, adj_matrix=None):

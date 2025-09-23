@@ -1,15 +1,17 @@
 import numpy as np
 from models.cost import CostFunction
 from models.phi import AggregationContributionFunction
+from models.constraints import Constraint
 from multipledispatch import dispatch
 
 
 class Agent:
-    def __init__(self, idx, cost_fn : CostFunction, phi : AggregationContributionFunction, init_state : np.array):
+    def __init__(self, idx, cost_fn : CostFunction, phi : AggregationContributionFunction, init_state : np.array, local_constraint : Constraint = None):
         self.idx = idx
         self.zz = init_state
         self._phi_obj = phi
         self._cost_fn_obj = cost_fn
+        self.local_constraint = local_constraint
 
         # print(f"[Agent-{idx}] init cond. = {self.zz}")
 
@@ -86,3 +88,14 @@ class Agent:
     @dispatch()
     def nabla_phi(self):
         return self.nabla_phi(self.zz)
+
+    @dispatch(np.ndarray)
+    def check_constraint(self, zz):
+        if self.local_constraint is not None:
+            return self.local_constraint.check(zz)
+        else:
+            raise ValueError(f"Local constraint of Agent-{self.idx} is None")
+        
+    @dispatch()
+    def check_constraint(self):
+        self.check_constraint(self.zz)

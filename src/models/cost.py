@@ -56,6 +56,9 @@ class LocalCloudTradeoffCostFunction(CostFunction):
         self.cost_params = cost_params
 
     def cost_fn(self, zz_i, sigma):
+        assert np.ndim(zz_i) == 0 or (np.ndim(zz_i) == 1 and zz_i.size == 1), \
+            f"LocalCloudTradeoffCostFunction expects scalar z_i, got shape {np.shape(zz_i)}"
+
         """ [ cost function ]:  $$ \ell_i(z_i, \sigma(z)) := (1-z_i) \cdot \ell_i^{loc}(z_i) + z_i \cdot \ell_i^{cloud}(\sigma(\textbf{z})) $$
         """
 
@@ -86,6 +89,9 @@ class LocalCloudTradeoffCostFunction(CostFunction):
         return cost
 
     def nabla_1(self, zz_i, sigma):
+        assert np.ndim(zz_i) == 0 or (np.ndim(zz_i) == 1 and zz_i.size == 1), \
+            f"LocalCloudTradeoffCostFunction expects scalar z_i, got shape {np.shape(zz_i)}"
+
         # \nabla_1 \ell_i (z_i, \sigma(\textbf{z}))= - (e_i^{task} + t_i^{task}) + \alpha t \sigma(\textbf{z}) + \beta e_i^{tx} + \frac{\alpha \cdot t}{N}z_i
         # $$ \nabla_1 \ell_i (z_i, \sigma(\textbf{z}))= - (e_i^{task} + t_i^{task}) + \alpha t \sigma(\textbf{z}) + \beta e_i^{tx} $$
         grad =  -(self.cost_params.energy_task + self.cost_params.time_task) \
@@ -95,6 +101,9 @@ class LocalCloudTradeoffCostFunction(CostFunction):
         return grad
 
     def nabla_2(self, zz_i, sigma):
+        assert np.ndim(zz_i) == 0 or (np.ndim(zz_i) == 1 and zz_i.size == 1), \
+            f"LocalCloudTradeoffCostFunction expects scalar z_i, got shape {np.shape(zz_i)}"
+        
         # $$ \nabla_2 \ell_i (z_i, \sigma(\textbf{z})) = z_i \cdot \alpha \cdot t  $$
         grad = zz_i * self.cost_params.alpha * self.cost_params.time_rtt
         return grad

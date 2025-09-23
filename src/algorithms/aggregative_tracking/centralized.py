@@ -28,11 +28,14 @@ class CentralizedGradientMethod(Algorithm):
             cost = self.problem.centralized_cost_fn()
             total_grad = np.zeros(d)
             
-            for agent_i in self.problem.agents:
+            # [ new states ]
+            zz_k_plus_1 = np.zeros((N,) + d)
+
+            for i, agent_i in enumerate(self.problem.agents):
                 gradient_sum = np.zeros(d)
 
                 for agent_j in self.problem.agents:
-                    gradient_sum += agent_j.nabla_2(agent_j["zz"] , sigma)
+                    gradient_sum += agent_j.nabla_2(agent_j["zz"], sigma)
 
                 # [ compute gradients ]
                 nabla_1 = agent_i.nabla_1(agent_i["zz"], sigma)
@@ -40,16 +43,20 @@ class CentralizedGradientMethod(Algorithm):
                 grad_i = nabla_1 + 1/N * nabla_phi @ gradient_sum
                 
                 # [ update zz_i ]
-                agent_i["zz"] = agent_i["zz"] - stepsize * grad_i
-                agent_i["zz"] = np.clip(agent_i["zz"], 0, 1)   # vincolo [0,1]
+                zz_k_plus_1[i] = agent_i["zz"] - stepsize * grad_i
+                zz_k_plus_1[i] = np.clip(zz_k_plus_1[i], 0, 1)   # vincolo [0,1]
                 
                 total_grad += grad_i
+            
+            # [ writeback ]
+            for i, agent_i in enumerate(self.problem.agents):
+                agent_i["zz"] = zz_k_plus_1[i]
 
             # [ collectors ]
-            collector_sigma.log(k, sigma)
+            collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
             collector_cost.log(k, cost)
             collector_grad.log(k, total_grad)
-            collector_zz.log(k, np.array([ag.zz for ag in self.problem.agents]))
+            collector_sigma.log(k, sigma)
 
         result = RunResult(
             zz_traj=collector_zz.get(),
