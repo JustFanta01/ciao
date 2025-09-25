@@ -17,22 +17,22 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
             self.rho = rho
 
 
-    def H(self, axmb, ll, rho):
+    def H(self, axmb, l_j, rho):
         # $$H_\rho(\cdot, \cdot) \text{ is a penalty function on constraint violation} $$
         # defined as follows:
 
         # $$ \text{If } \rho(\mathbb{a}_j^T\mathbb{x} - b_j) + \lambda_j \ge 0 \text{:}$$
-        if rho * axmb + ll >= 0:
+        if rho * axmb + l_j >= 0:
             
             #  $$ H_\rho(\mathbb{a}_j^T\mathbb{x} - b_j, \lambda_j) = (\mathbb{a}_j^T\mathbb{x} - b_j) \lambda_j + \frac{\rho}{2}(\mathbb{a}_j^T\mathbb{x} - b_j)^2$$
             
-            return axmb * ll + 0.5 * rho * axmb ** 2
+            return axmb * l_j + 0.5 * rho * (axmb ** 2)
         
         else: # \rho(\mathbb{a}_j^T\mathbb{x} - b_j) + \lambda_j \lt 0 \text{:}
         
             # $$     H_\rho(\mathbb{a}_j^T\mathbb{x} - b_j, \lambda_j) = -\frac{1}{2}\frac{\lambda_j^2}{\rho} $$
             
-            return -0.5 * ll ** 2 / rho
+            return -0.5 * (l_j ** 2) / rho
     
     def H_nabla_1_jth(self, a_j, xx, b_j, l_j, rho, j):
         
@@ -43,7 +43,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
         # aj is a column that represents the j-th row of the A matrix
         # aj.T is a row
         r_j = rho * (a_j.T@xx - b_j)
-        s_j = np.max(r_j + l_j, 0)
+        s_j = np.max([r_j + l_j, 0])
         return  s_j * a_j
 
     def H_nabla_2_jth(self, a_j, xx, b_j, l_j, rho, j):
@@ -53,8 +53,8 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
         e_j = np.zeros(self.m)
         e_j[j] = 1
         r_j = rho * (a_j.T@xx - b_j)
-        s_j = np.max(r_j + l_j, 0) - l_j
-        return 1/rho * s_j * e_j
+        s_j = np.max([r_j + l_j, 0]) - l_j
+        return s_j/rho * e_j
 
     def augmented_lagrangian(self, rho):
 
@@ -95,7 +95,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
         collector_lamda = TrajectoryCollector("lambda", K, (self.m,))
         
         collector_cost  = TrajectoryCollector("cost", K, ())
-        collector_grad_f = TrajectoryCollector("total gradient of f(x)", K, (n_tot,))
+        collector_grad_f = TrajectoryCollector("total gradient of f(x)", K, (self.N,) + self.d)
         
         
         # $$ \nabla f_0(\mathbf{x}^*) + \sum_{i=1}^{m} \lambda_i \nabla f_i(\mathbf{x}^*) + \sum_{j=1}^{p} \nu_j \nabla h_j(\mathbf{x}^*) = 0$$
@@ -109,10 +109,10 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
 
         collector_sigma = TrajectoryCollector("sigma", K, self.d)
 
-        # [ init ]
-        # TODO: what is the right init value of lambda?
-        # at least positive and then the dynamics will keep it positive...
+        # [ init ] #TODO: bad tuning and maybe it's a correction to the wrong part of the code!
         self.lamda = np.zeros(self.m)
+        # self.lamda = np.zeros(self.m) + 0.20 # OVERSHOOTS
+        # self.lamda = np.zeros(self.m) + 0.25 # OK
 
         for k in range(K):
             # [ snapshot ]
@@ -126,103 +126,99 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
 
             grad_f_list = []
             for i, agent_i in enumerate(self.problem.agents):
-                grad_i_f = self.problem.centralized_gradient_of_cost_fn_of_agent(i)
+                grad_i_f = self.problem.centralized_gradient_of_cost_fn_of_agent(i) # shape: (d,)
                 grad_f_list.append(grad_i_f)
-            grad_f = np.concatenate(grad_f_list) # shape (N*d,)
-            assert grad_f.shape == (n_tot,), f"grad_f shape {grad_f.shape}, expected {(n_tot,)}"
+            total_grad_f = np.concatenate(grad_f_list) # shape (N*d,)
+            assert total_grad_f.shape == (n_tot,), f"total_grad_f shape {total_grad_f.shape}, expected {(n_tot,)}"
             
-            H_nabla_1s_list = [] # m elemtents, each (N*d,)
+            H_nabla_1s_list = [] # m elements, each (N*d,)
             for j in range(self.m):
-                H_j_nabla_1 = self.H_nabla_1_jth(A[j], zz_k, b[j], self.lamda[j], rho, j)
+                H_j_nabla_1 = self.H_nabla_1_jth(A[j], zz_k, b[j], self.lamda[j], rho, j) # (N*d,)
                 H_nabla_1s_list.append(H_j_nabla_1)
             H_nabla_1 = np.sum(H_nabla_1s_list, axis=0) # (N*d,)
             assert H_nabla_1.shape == (n_tot,), f"H_nabla_1 wrong shape {H_nabla_1.shape}"
             
-            # [ z update ] : gradient descent
+            # ------[ z update / gradient descent ]------ 
             # fixed time constant to 1
 
-            # $$ \dot{x} = -\nabla_x L(x, \lambda) = -\nabla f(x) - \sum_{j=1}^{m} \nabla_x H_\rho(a_j^T x - b_j, \lambda_j) = -\nabla f(x) - \sum_{j=1}^{m} \max(\rho(a_j^T x - b_j), 0) a_j $$
+            # $$ \dot{x} = -\nabla_x L(x, \lambda) = -\nabla f(x) - \sum_{j=1}^{m} \nabla_x H_\rho(a_j^T x - b_j, \lambda_j) = -\nabla f(x) - \sum_{j=1}^{m} \max(\rho(a_j^T x - b_j) + \lambda_j, 0) a_j $$
 
-            zz_k_plus_1 = zz_k - stepsize * (grad_f + H_nabla_1)
+            ## compact form:
+            # s_k = np.maximum(rho * (A @ zz_k - b) + lamda_k, 0.0)
+            # zz_k_plus_1 = zz_k - stepsize * (total_grad_f + A.T @ s_k)
 
+            zz_k_plus_1 = zz_k - stepsize * (total_grad_f + H_nabla_1)
 
-            # [ lamba update ] : gradient ascent
+            # ------[ lamba update / gradient ascent ]------
             # $$\eta$$ time constant for dual (absorbed in dual_stepsize?)
 
-            H_nabla_2s_list = [] # m elements, each (m,1)
+            H_nabla_2s_list = [] # m elements, each (m,)
             for j in range(self.m):
-                H_i_nabla_2 = self.H_nabla_2_jth(A[j], zz_k, b[j], self.lamda[j], rho, j)
+                H_i_nabla_2 = self.H_nabla_2_jth(A[j], zz_k, b[j], self.lamda[j], rho, j) # shape (m,)
                 H_nabla_2s_list.append(H_i_nabla_2)
-            H_nabla_2 = np.sum(H_nabla_2s_list, axis=0)
+            H_nabla_2 = np.sum(H_nabla_2s_list, axis=0) # shape (m,)
             assert H_nabla_2.shape == (self.m,), f"H_nabla_2 wrong shape {H_nabla_2.shape}"
 
 
             # $$\dot{\lambda} = \eta \nabla_{\lambda} \mathcal{L}(x, \lambda) = \eta \sum_{j=1}^{m} \nabla_{\lambda} H_{\rho}(a_j^T x - b_j, \lambda_j) = \eta \sum_{j=1}^{m} \frac{\max(\rho(a_j^T x - b_j) + \lambda_j, 0) - \lambda_j}{\rho} e_j$$
             
             
+            ## compact form:
+            # H_nabla_2_new = (s_k - lamda_k) / rho
+            # lambda_k_plus_1 = lamda_k + dual_stepsize * ( H_nabla_2_new )
+            
             lambda_k_plus_1 = lamda_k + dual_stepsize * H_nabla_2
-
-
-            # $$ \nabla_x \mathcal{L}(x, \lambda) = \nabla f(x) + \sum_{j=1}^{m} \nabla_x H_\rho(a_j^T x - b_j, \lambda_j) $$
             
+
             # Monitor that: che $$ \norm{\nabla_x \mathcal{L}(x, \lambda)} \rightarrow 0 $$ e $$ \norm{\nabla_\lambda \mathcal{L}(x, \lambda)} \rightarrow 0 $$
-            # TODO: (?!?!?)
 
+            # $$ \nabla_x \mathcal{L}(x, \lambda) = \nabla f(x) + \sum_{j=1}^{m} \nabla_x H_\rho(a_j^T x - b_j, \lambda_j) $$            
             
-            # total_grad_L_in_x = np.sum(grad_f_list, axis=0) + H_nabla_1
-            total_grad_L_in_x = grad_f + H_nabla_1 # TODO: is it the right thing? sum of \ell_i... ?
+            # $$ \nabla_{\lambda} \mathcal{L}(x, \lambda) = \sum_{j=1}^{m} \nabla_{\lambda} H_{\rho}(a_j^T x - b_j, \lambda_j) $$
+            
+            
+            total_grad_L_in_x = total_grad_f + H_nabla_1
             total_grad_L_in_lamda = H_nabla_2
-            total_grad_f = np.sum(grad_f_list)
 
-            # [ KKT conditions ]
+            # ------[ KKT conditions ]------
 
             # $$ \nabla f(\mathbf{x}^*) + \sum_{i=1}^{m} \lambda_i \nabla h_i(\mathbf{x}^*) + \sum_{j=1}^{p} \nu_j \nabla g_j(\mathbf{x}^*) = 0$$
             
-            
-            kkt_stationarity = total_grad_f
-            for i in range(self.m):
-                grad_constraint_h_i = A[i]
-                kkt_stationarity += lamda_k[i] * grad_constraint_h_i # TODO: missing equality constrain var.
+            # kkt_stationarity = total_grad_f
+            # for i in range(self.m):
+            #     grad_constraint_h_i = A[i]
+            #     kkt_stationarity += lamda_k[i] * grad_constraint_h_i # TODO: missing equality constrain var.
 
-            # ---- KKT residuals ----
-            # primal residual r = A x - b
+            # primal residual: r = A x - b
             r = A @ zz_k - b
-            # print(f"A: {A}")
-            # print(f"zz_k: {zz_k}")
-            # print(f"b: {b}")
-            # print(f"residual: {r}")
-
-            # input("Press Enter to continue...")
-
+            
             # stationarity: ||∇f(x) + A^T λ||
-            stationarity = np.linalg.norm(grad_f + A.T @ self.lamda)
+            stationarity = np.linalg.norm(total_grad_f + A.T @ self.lamda)
 
             # primal feasibility: ||(Ax - b)_+||_∞
             primal_violation = np.max(np.maximum(r, 0.0))
 
-            # complementarity: max |λ_j * r_j| (max t highlight the one that is not zero! the "less satisfied constraint")
+            # complementarity: max |λ_j * r_j| (max to highlight the "less satisfied constraint")
             complementarity = np.max(np.abs(self.lamda * r))
 
-
-            # [ writeback ]
-            off = 0
-            for ag in self.problem.agents:
-                d_i = ag.zz.size
-                ag["zz"] = zz_k_plus_1[off:off+d_i].reshape(ag["zz"].shape)
-                off += d_i
-            self.lamda = lambda_k_plus_1
-            
-
-            # [ collector ]
+            # ------[ collector ]------
             collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
             collector_cost.log(k, cost)
-            collector_grad_f.log(k, total_grad_f)
+            _total_grad_f = total_grad_f.reshape((self.N,) + self.d)
+            collector_grad_f.log(k, _total_grad_f)
             collector_lamda.log(k, self.lamda)
             collector_sigma.log(k, sigma)
             collector_grad_L_x.log(k, total_grad_L_in_x)
             collector_grad_L_l.log(k, total_grad_L_in_lamda)
             collector_kkt.log(k, np.array([stationarity, primal_violation, complementarity], dtype=float))
             
+            # ------[ writeback ]------
+            off = 0
+            for ag in self.problem.agents:
+                d_i = ag.zz.size
+                ag["zz"] = zz_k_plus_1[off:off+d_i].reshape(ag["zz"].shape)
+                off += d_i
+            self.lamda = lambda_k_plus_1
 
         result = RunResult(
             zz_traj = collector_zz.get(),

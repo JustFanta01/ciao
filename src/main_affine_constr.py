@@ -33,9 +33,9 @@ def main():
     energy_tx = np.ones(N)*3
     time_rtt = np.ones(N)*4
 
-    # init_state = rng.uniform(0, 1, size=(N, d))
-    init_state = np.array([[0.7], [0.9]])
-    # print(f"init_state: {init_state}")
+    init_state = rng.uniform(0, 0.1, size=(N, d))
+    # init_state = np.array([[0],[0]])
+    print(f"init_state: {init_state}")
 
     def setup_problem():
         agents = []
@@ -47,12 +47,17 @@ def main():
             cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
             cost_fn = QuadraticCostFunction(cost_params)
 
-            # A = np.zeros((m,d))
-            # b = np.zeros(m)
+            # A = np.ones((m,d))
+            # b = np.ones(m)
             
-            
-            A = np.ones((m,d))
-            b = np.ones((m)) * 0.35 # Agents must not overshoot a threshold
+            # x + 2y <= 1
+            if i == 0:
+                A = np.ones((m,d))
+                b = np.ones((m)) * 0.5
+            if i == 1:
+                A = np.ones((m,d)) * 2
+                b = np.ones((m)) * 0.5
+
             lc = LinearConstraint(A, b)
 
             phi_fn = IdentityFunction(d)
@@ -81,15 +86,18 @@ def main():
 
     centralized = AugmentedPrimalDualGradientDescent(problem)
     args = {
-        "max_iter": 2000, 
-        "stepsize": 0.01,
+        "max_iter": 2500, 
+        "stepsize": 0.05,
         "seed": seed,
-        "rho": 1,
-        "dual_stepsize": 0.01
+        "rho": 5,
+        "dual_stepsize": 0.05
     }
     algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
     result = centralized.run(algo_params)
-    # result.summary()
+
+    plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
+
+    result.summary()
 
     plotter = plots.ConstrainedRunResultPlotter(result)
     plotter\
