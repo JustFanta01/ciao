@@ -36,7 +36,11 @@ class BaseRunResultPlotter:
 
     def plot_grad_norm(self, semilogy=True):
         grad = self.result.grad_traj
-        grad_norm = np.linalg.norm(grad, axis=1)
+        dims = len(grad.shape)
+        # the norm of the whole matrix / vector present at each iteration
+        # so if grad.shape = (K, N, d1, d2, d3)
+        # grad_norm[k] is the norm of the (N, d1, d2, d3) matrix at grad[k]
+        grad_norm = np.linalg.norm(grad, axis=tuple(range(1, dims)))
         K = grad_norm.shape[0]
         ax = self.axes[0, 1]
         if semilogy:

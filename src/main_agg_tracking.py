@@ -17,7 +17,7 @@ from utils import graph_utils
 
 
 def main():
-    N = 2  # number of agents
+    N = 5  # number of agents
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
@@ -47,12 +47,12 @@ def main():
     def setup_problem():
         agents = []
         for i in range(N):
-            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
-            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            # )
-            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
-            cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
-            cost_fn = QuadraticCostFunction(cost_params)
+            cost_params = LocalCloudTradeoffCostFunction.CostParams(
+                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            )
+            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            # cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
+            # cost_fn = QuadraticCostFunction(cost_params)
             phi_fn = IdentityFunction(d)
             # init_state = rng.uniform(0, 1, size=d)
             agent_i = Agent(i, cost_fn, phi_fn, init_state[i])
@@ -77,10 +77,15 @@ def main():
     # -----------------------
     problem = setup_problem()
     centralized = CentralizedGradientMethod(problem)
-    algo_params = CentralizedGradientMethod.AlgorithmParams(max_iter=500, stepsize=0.01, seed=seed)
+    args = {
+        "max_iter": 1000,
+        "stepsize": 0.01, 
+        "seed":seed
+    }
+    algo_params = CentralizedGradientMethod.AlgorithmParams(**args)
     result = centralized.run(algo_params)
     
-    plotter = plots.BaseRunResultPlotter(result, semilogy=True)
+    plotter = plots.BaseRunResultPlotter(result)
     plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
@@ -90,10 +95,15 @@ def main():
     # -----------------------
     problem = setup_problem()
     distributed = DistributedAggregativeTracking(problem)
-    algo_params = DistributedAggregativeTracking.AlgorithmParams(max_iter=500, stepsize=0.01, seed=seed)
+    args = {
+        "max_iter": 1000,
+        "stepsize": 0.01, 
+        "seed":seed
+    }
+    algo_params = DistributedAggregativeTracking.AlgorithmParams(**args)
     result = distributed.run(algo_params)
 
-    plotter = plots.BaseRunResultPlotter(result, semilogy=True)
+    plotter = plots.BaseRunResultPlotter(result)
     plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 

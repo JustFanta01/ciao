@@ -58,13 +58,13 @@ class OptimizationProblem():
         agent_i = self.agents[idx]
 
         # [ compute gradients ]
-        gradient_sum = np.zeros(self.d)
+        nabla_2_sum = np.zeros(self.d)
         for agent_j in self.agents:
-            gradient_sum += agent_j.nabla_2(agent_j["zz"] , sigma)
+            nabla_2_sum += agent_j.nabla_2(agent_j["zz"] , sigma)
         
         nabla_1 = agent_i.nabla_1(agent_i["zz"], sigma)
         nabla_phi = agent_i.nabla_phi(agent_i["zz"])
-        grad_i_f = nabla_1 + 1/self.N * nabla_phi @ gradient_sum
+        grad_i_f = nabla_1 + 1/self.N * nabla_phi @ nabla_2_sum
 
         return grad_i_f
 
