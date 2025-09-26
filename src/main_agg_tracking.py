@@ -5,7 +5,7 @@ import os
 
 from models.algorithm_interface import RunResult
 from algorithms.aggregative_tracking.centralized import CentralizedGradientMethod
-from algorithms.aggregative_tracking.distributed import DistributedAggregativeTracking
+from algorithms.aggregative_tracking.distributed import AggregativeTracking
 from models.phi import IdentityFunction
 from models.optimization_problem import OptimizationProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -94,13 +94,13 @@ def main():
     # |     DISTRIBUTED     |
     # -----------------------
     problem = setup_problem()
-    distributed = DistributedAggregativeTracking(problem)
+    distributed = AggregativeTracking(problem)
     args = {
         "max_iter": 1000,
         "stepsize": 0.01, 
         "seed":seed
     }
-    algo_params = DistributedAggregativeTracking.AlgorithmParams(**args)
+    algo_params = AggregativeTracking.AlgorithmParams(**args)
     result = distributed.run(algo_params)
 
     plotter = plots.BaseRunResultPlotter(result)

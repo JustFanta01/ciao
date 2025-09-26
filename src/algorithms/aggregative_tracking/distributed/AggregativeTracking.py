@@ -1,7 +1,7 @@
 import numpy as np
 from models.algorithm_interface import RunResult, OptimizationProblem, Algorithm, TrajectoryCollector
 
-class DistributedAggregativeTracking(Algorithm):
+class AggregativeTracking(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
         def __init__(self, max_iter: int, stepsize: float, seed: int):
             super().__init__(max_iter, stepsize, seed)

@@ -4,8 +4,7 @@ import sys
 import os
 
 from models.algorithm_interface import RunResult
-from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent
-# from algorithms.affine_constraints import DistributedAggregativeTracking
+from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent, ArrowHurwiczUzawaPrimalDualGradientDescent
 from models.phi import IdentityFunction
 from models.optimization_problem import AffineCouplingProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -33,8 +32,8 @@ def main():
     energy_tx = np.ones(N)*3
     time_rtt = np.ones(N)*4
 
-    init_state = rng.uniform(0, 0.1, size=(N, d))
-    # init_state = np.array([[0],[0]])
+    # init_state = rng.uniform(0, 0.1, size=(N, d))
+    init_state = np.array([[0.1],[0.3]])
     print(f"init_state: {init_state}")
 
     def setup_problem():
@@ -82,34 +81,65 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    problem = setup_problem()
+    if False:
+        problem = setup_problem()
 
-    centralized = AugmentedPrimalDualGradientDescent(problem)
-    args = {
-        "max_iter": 2500, 
-        "stepsize": 0.05,
-        "seed": seed,
-        "rho": 5,
-        "dual_stepsize": 0.05
-    }
-    algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
-    result = centralized.run(algo_params)
+        centralized = AugmentedPrimalDualGradientDescent(problem)
+        args = {
+            "max_iter": 2500, 
+            "stepsize": 0.01,
+            "seed": seed,
+            "rho": 3,
+            "dual_stepsize": 0.05
+        }
+        algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
+        result = centralized.run(algo_params)
 
-    plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
+        plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
 
-    result.summary()
+        result.summary()
 
-    plotter = plots.ConstrainedRunResultPlotter(result)
-    plotter\
-        .plot_cost()\
-        .plot_grad_norm()\
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .plot_Lagr_stationarity()\
-        .plot_kkt_conditions(semilogy=False)\
-        .plot_lambda(semilogy=False)\
-        .show()
-    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .plot_Lagr_stationarity()\
+            .plot_kkt_conditions(semilogy=False)\
+            .plot_lambda(semilogy=False)\
+            .show()
+        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+
+    # -----------------------
+    # |     CENTRALIZED     |
+    # -----------------------
+    if True:
+        problem = setup_problem()
+        centralized = ArrowHurwiczUzawaPrimalDualGradientDescent(problem)
+        args = {
+            "max_iter": 2500, 
+            "stepsize": 0.01,
+            "seed": seed,
+        }
+        algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
+        result = centralized.run(algo_params)
+
+        plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
+
+        result.summary()
+
+        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .plot_Lagr_stationarity()\
+            .plot_kkt_conditions(semilogy=False)\
+            .plot_lambda(semilogy=False)\
+            .show()
+        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # -----------------------
     # |     DISTRIBUTED     |

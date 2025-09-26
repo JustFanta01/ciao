@@ -83,6 +83,10 @@ class ConstrainedOptimizationProblem(OptimizationProblem, ABC):
         pass
 
     @abstractmethod
+    def global_residual():
+        pass
+
+    @abstractmethod
     def global_matrices():
         pass
 
