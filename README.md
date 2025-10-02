@@ -1,10 +1,10 @@
 # C.I.A.O.: Constrained Intelligent Aggregative Optimization
 
-:warning: Work In Progress!
+:construction: Work In Progress! 
 
 This repository accompanies my thesis work on **distributed coordination algorithms for constrained aggregative optimization problems**. 
 
-## Motivation
+## 🔎 Motivation
 
 We study a **cloud offloading scenario**, where multiple users (e.g., robots, IoT devices, satellites) decide how much computation to execute locally vs. offload to a cloud server.
 - **Local execution** → higher energy consumption, reduced battery lifetime.  
@@ -24,7 +24,7 @@ The challenge is to **balance local and cloud execution** to minimize costs whil
 
 ---
 
-## 🧩 Problem Formulations
+## ✏️ Problem Formulations
 
 We consider several variants:
 
@@ -45,7 +45,7 @@ We consider several variants:
 
 ---
 
-## ⚙️ Algorithms Implemented
+## 🚀 Algorithms Implemented
 
 - **Saddle-Point Dynamics (PDGD)**  
   - Based on Qu & Li (2019).  
@@ -61,7 +61,7 @@ We consider several variants:
 
 ---
 
-## References
+## 📚 References
 
 - G. Qu, N. Li, *On the Exponential Stability of Primal-Dual Gradient Dynamics*, IEEE Control Systems Letters, 2019.  
 - B. Notarnicola, *Semiglobal Exponential Stability of Discrete-Time Primal-Dual Algorithms for Constrained Optimization*, Automatica, 2024.  
@@ -69,7 +69,7 @@ We consider several variants:
 
 ---
 
-## Authors
+## 👥 Authors
 
 - **Luca Fantini** (Master student)  
 - **Gianluca Bianchin** (Supervisor)  
