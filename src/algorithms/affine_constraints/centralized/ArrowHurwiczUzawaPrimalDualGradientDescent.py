@@ -1,19 +1,23 @@
 import numpy as np
 from models.algorithm_interface import RunResult, Algorithm, TrajectoryCollector
 from models.optimization_problem import ConstrainedOptimizationProblem
+from typing import cast
 
 class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
     def __init__(self, problem: ConstrainedOptimizationProblem):
         super().__init__(problem)
         self.lamda = None
+        self.problem = cast(ConstrainedOptimizationProblem, self.problem)
 
     class AlgorithmParams(Algorithm.AlgorithmParams):
-        def __init__(self, max_iter: int, stepsize: float, seed: int):
+        def __init__(self, max_iter: int, stepsize: float, seed: int, dual_stepsize = None):
             super().__init__(max_iter, stepsize, seed)
+            self.dual_stepsize = dual_stepsize if dual_stepsize is not None else stepsize
     
     def run(self, params: AlgorithmParams):
         K = params.max_iter
-        stepsize = params.stepsize  
+        stepsize = params.stepsize
+        dual_stepsize = params.dual_stepsize
         rng = np.random.default_rng(params.seed)
 
         A, b = self.problem.global_matrices()
@@ -45,6 +49,8 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
 
         # [ init ]
         self.lamda = np.zeros(self.m)
+        # self.lamda = -self.problem.global_residual()
+        assert self.lamda >= 0, "Negative lambda"
 
         def lagrangian():
             # f(x) + (A@xx-b).T @ ll
@@ -78,7 +84,7 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
 
             # ------[ lamba update / gradient ascent ]------
             violation = A @ zz_k - b
-            lambda_k_plus_1 = np.maximum(0.0, lamda_k + stepsize * violation)
+            lambda_k_plus_1 = np.maximum(0.0, lamda_k + dual_stepsize * violation)
             
             total_grad_L_in_lamda = violation
 

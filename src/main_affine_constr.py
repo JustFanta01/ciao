@@ -121,11 +121,18 @@ def main():
             "max_iter": 2500, 
             "stepsize": 0.01,
             "seed": seed,
+            "dual_stepsize": 0.01
         }
         algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
         result = centralized.run(algo_params)
 
-        plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
+        A = []
+        b = 0
+        for ag in problem.agents:
+            A_i, b_i = ag.local_constraint.matrices()
+            A.append(A_i[0,0])
+            b += b_i
+        plots.plot_trajectory_plane_with_affine_constraint(result, A, b)
 
         result.summary()
 
