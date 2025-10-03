@@ -1,7 +1,7 @@
 import numpy as np
-from models.cost import CostFunction
-from models.phi import AggregationContributionFunction
-from models.constraints import Constraint
+from .cost import CostFunction
+from .phi import AggregationContributionFunction
+from .constraints import Constraint
 from multipledispatch import dispatch
 
 
@@ -33,6 +33,7 @@ class Agent:
     # "setitem" → agent["key"] = value
     def __setitem__(self, key, value):
         if key == "zz":
+            # TODO: add the prejection in [0,1] here?
             self.zz = value
         else:
             self.buffers[key] = value

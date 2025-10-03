@@ -1,0 +1,73 @@
+# tests/test_algorithms_basic.py
+import numpy as np
+import pytest
+
+_TOL_COST_MONO   = 1e-6       # tolleranza micro su monotonia
+_TOL_FINAL_CLOSE = 1e-2
+_TOL_GRAD_DEC    = 1e-3
+_TOL_RESIDUAL    = 5e-2
+
+# -------------------- Aggregative: base run & proprietà --------------------
+
+def test_agg_run_shapes_and_finiteness(problem_agg, algo_agg):
+    Algo, params = algo_agg
+    algo = Algo(problem_agg)
+    res = algo.run(params)
+
+    assert res.zz_traj.ndim == 3           # (K,N,d)
+    assert res.cost_traj.ndim == 1
+    assert res.grad_traj.ndim in (2,3)     # alcune implementazioni possono loggare (K,d) o (K,N,d)
+    assert np.isfinite(res.zz_traj).all()
+    assert np.isfinite(res.cost_traj).all()
+
+def test_agg_cost_not_exploding_and_tends_down(problem_agg, algo_agg):
+    Algo, params = algo_agg
+    algo = Algo(problem_agg)
+    res = algo.run(params)
+
+    # Non esplode
+    assert np.max(res.cost_traj) < 1e6
+
+    # Tende a scendere: ultimo <= min(prima metà) + tol
+    halfway = len(res.cost_traj)//2
+    assert res.cost_traj[-1] <= np.min(res.cost_traj[:halfway]) + _TOL_COST_MONO
+
+def test_agg_grad_norm_tends_down(problem_agg, algo_agg):
+    Algo, params = algo_agg
+    algo = Algo(problem_agg)
+    grad = algo.run(params).grad_traj
+
+    dims = len(grad.shape)
+    # the norm of the whole matrix / vector present at each iteration
+    # so if grad.shape = (K, N, d1, d2, d3)
+    # grad_norm[k] is the norm of the (N, d1, d2, d3) matrix at grad[k]
+    grad_norm = np.linalg.norm(grad, axis=tuple(range(1, dims)))
+    K = grad_norm.shape[0]
+
+    third_of_the_way=grad_norm[: max(2, len(grad_norm)//3)]
+    assert grad_norm[-1] <= np.median(third_of_the_way) + _TOL_GRAD_DEC
+
+# -------------------- Aggregative: centr. vs distr. --------------------
+
+@pytest.mark.slow
+def test_agg_centralized_vs_distributed_close(problem_agg):
+    from src.algorithms.aggregative_tracking.centralized.CentralizedGradientMethod import CentralizedGradientMethod
+    from src.algorithms.aggregative_tracking.distributed.AggregativeTracking import AggregativeTracking
+
+    central = CentralizedGradientMethod(problem_agg)
+    distr   = AggregativeTracking(problem_agg)
+
+    res_c = central.run(CentralizedGradientMethod.AlgorithmParams(
+        max_iter=2000, stepsize=0.01, seed=3
+    ))
+    res_d = distr.run(AggregativeTracking.AlgorithmParams(
+        max_iter=2000, stepsize=0.01, seed=3
+    ))
+
+    # confronto costi finali
+    assert abs(res_c.cost_traj[-1] - res_d.cost_traj[-1]) <= 5e-2
+
+    # confronto media degli stati finali (zbar)
+    zbar_c = np.mean(res_c.zz_traj[-1], axis=0)
+    zbar_d = np.mean(res_d.zz_traj[-1], axis=0)
+    assert np.linalg.norm(zbar_c - zbar_d) <= _TOL_FINAL_CLOSE

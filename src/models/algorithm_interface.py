@@ -53,15 +53,39 @@ class RunResult:
 class TrajectoryCollector:
     def __init__(self, name, max_iter, shape):
         """
-        name         : identifier (e.g. 'z', 'grad', 'cost')
-        max_iter     : number of iterations
-        shape        : tuple (dimension of the logged variable per iteration)
+        shape: tuple with the dimension of the iteration
+               scalare -> shape=()
         """
         self.name = name
-        self.data = np.zeros((max_iter,) + shape) # (500,)+(10,2) = (500,10,2)
+        self.shape = tuple(shape) 
+        self.data = np.zeros((max_iter,) + self.shape)
 
     def log(self, k, value):
-        self.data[k] = value
+        arr = np.asarray(value)
+
+        # Se il collector è scalare, consenti (,) oppure (1,) ecc.
+        if self.shape == ():
+            if arr.shape == ():
+                self.data[k] = arr
+                return
+            if arr.size == 1:
+                self.data[k] = arr.reshape(())  # oppure arr.item()
+                return
+            raise AssertionError(
+                f"{self.name}: value.size={arr.size} ma serve uno scalare; shape collector: {self.shape}"
+            )
+
+        # Per array: togli assi di lunghezza 1 **solo** se dopo combacia
+        if arr.shape != self.shape:
+            squeezed = np.squeeze(arr)
+            if squeezed.shape == self.shape:
+                arr = squeezed
+            else:
+                raise AssertionError(
+                    f"{self.name}: value.shape={arr.shape} deve essere {self.shape}"
+                )
+
+        self.data[k] = arr
 
     def get(self):
         return self.data

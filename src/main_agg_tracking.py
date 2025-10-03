@@ -79,7 +79,7 @@ def main():
     centralized = CentralizedGradientMethod(problem)
     args = {
         "max_iter": 1000,
-        "stepsize": 0.01, 
+        "stepsize": 0.01,
         "seed":seed
     }
     algo_params = CentralizedGradientMethod.AlgorithmParams(**args)

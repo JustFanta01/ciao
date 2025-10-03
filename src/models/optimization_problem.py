@@ -1,5 +1,5 @@
 import numpy as np
-from models.agent import Agent
+from .agent import Agent
 from abc import ABC, abstractmethod
 
 class OptimizationProblem():
