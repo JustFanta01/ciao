@@ -12,7 +12,7 @@ class OptimizationProblem():
         self.seed = seed
 
         self.N = len(agents)
-        self.d = agents[0].zz.shape
+        self.d = agents[0].zz.shape[0] # flatten dimension!
 
     def sigma(self):
         
@@ -109,19 +109,27 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
             B_list.append(B_i)
             b_list.append(b_i)
         
+        # number of constraints
+        m = B_list[0].shape[0]
+        
         # self.B_local = self._block_diag(B_list)         # shape: (N*m, N*d)
         # self.b_local = np.concatenate(b_list, axis=0)   # shape: (N*m, 1)
         
         self.B_global = np.hstack(B_list)                   # shape (m, N*d)
         self.b_global = np.sum(b_list, axis=0)              # shape (m, 1)
 
-        # print(f"self.B_global.shape: {self.B_global.shape}")
-        # print(f"self.b_global.shape: {self.b_global.shape}")
+        assert self.B_global.shape == (m, self.N*self.d)
+        assert self.b_global.shape == (m,)
+
+        print(self.B_global)
+        print(self.b_global)
         # [ N=5, d=2, m=3
         #  [0. 0. 1. 1. 2. 2. 3. 3. 4. 4.]
         #  [0. 0. 1. 1. 2. 2. 3. 3. 4. 4.]
         #  [0. 0. 1. 1. 2. 2. 3. 3. 4. 4.]
         # ]
+
+        self.m = self.B_global.shape[0]
 
     def check(self):
         return self.global_residual() <= 0
@@ -131,6 +139,7 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         # it returns $$ \sum_{i=0}^{N}B_i z_i - \sum_{i=0}^{N}b_i $$
 
         z_tot = np.concatenate([ag["zz"] for ag in self.agents])  # shape (N*d,)
+        assert z_tot.shape == (self.N*self.d,)
         return self.B_global @ z_tot - self.b_global
     
     def _block_diag(self, matrices):

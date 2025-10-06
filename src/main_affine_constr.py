@@ -18,7 +18,7 @@ from utils import graph_utils
 
 def main():
     N = 2  # number of agents
-    m = 1 # number of affine constraints per agent, B_i is a matrix (m,d)
+    m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
@@ -34,7 +34,8 @@ def main():
 
     # init_state = rng.uniform(0, 0.1, size=(N, d))
     init_state = np.array([[0.1],[0.3]])
-    print(f"init_state: {init_state}")
+    # init_state = np.zeros(shape=(N,d))
+    # print(f"init_state: {init_state}")
 
     def setup_problem():
         agents = []
@@ -45,19 +46,11 @@ def main():
             # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
             cost_fn = QuadraticCostFunction(cost_params)
-
-            # A = np.ones((m,d))
-            # b = np.ones(m)
             
-            # x + 2y <= 1
-            if i == 0:
-                A = np.ones((m,d))
-                b = np.ones((m)) * 0.5
-            if i == 1:
-                A = np.ones((m,d)) * 2
-                b = np.ones((m)) * 0.5
-
-            lc = LinearConstraint(A, b)
+            B_i = np.ones((m,d))
+            b_i = np.ones((m,))*0.4
+            
+            lc = LinearConstraint(B_i, b_i)
 
             phi_fn = IdentityFunction(d)
             # init_state = rng.uniform(0, 1, size=d)
@@ -81,7 +74,7 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    if False:
+    if True:
         problem = setup_problem()
 
         centralized = AugmentedPrimalDualGradientDescent(problem)
@@ -95,7 +88,13 @@ def main():
         algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
         result = centralized.run(algo_params)
 
-        plots.plot_trajectory_plane_with_affine_constraint(result, a=[1,2], b=1)
+        A = []
+        b = 0
+        for ag in problem.agents:
+            A_i, b_i = ag.local_constraint.matrices()
+            A.append(A_i[0,0])
+            b += b_i
+        plots.plot_trajectory_plane_with_affine_constraint(result, A, b)
 
         result.summary()
 

@@ -15,12 +15,12 @@ class CentralizedGradientMethod(Algorithm):
         seed = params.seed
 
         N = self.problem.N
-        d = self.problem.d # tuple!
+        d = self.problem.d
         
         # [ define collectors ]
-        collector_zz = TrajectoryCollector("zz", max_iter, (N,) + d)
+        collector_zz = TrajectoryCollector("zz", max_iter, (N,d))
         collector_cost = TrajectoryCollector("cost", max_iter, ())
-        collector_grad = TrajectoryCollector("grad", max_iter, (N,) + d)
+        collector_grad = TrajectoryCollector("grad", max_iter, (N,d))
         collector_sigma = TrajectoryCollector("sigma", max_iter, d)
     
         for k in range(max_iter):
@@ -32,7 +32,7 @@ class CentralizedGradientMethod(Algorithm):
             total_grad_list = []
 
             # [ new states ]
-            zz_k_plus_1 = np.zeros((N,) + d)
+            zz_k_plus_1 = np.zeros((N,d))
 
             for i, agent_i in enumerate(self.problem.agents):
                 nabla_2_sum = np.zeros(d)
@@ -49,8 +49,10 @@ class CentralizedGradientMethod(Algorithm):
                 
                 
                 grad_i = nabla_1 + 1/N * nabla_phi @ nabla_2_sum
+                assert grad_i.shape == (d,), f"grad_i shape {grad_i.shape}, expected {(d,)}"
                 # grad_i_f = self.problem.centralized_gradient_of_cost_fn_of_agent(i) # shape: (d,)
                 
+
                 # [ update zz_i ]
                 zz_k_plus_1[i] = agent_i["zz"] - stepsize * grad_i
                 zz_k_plus_1[i] = np.clip(zz_k_plus_1[i], 0, 1)   # vincolo [0,1]

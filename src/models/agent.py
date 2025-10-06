@@ -6,14 +6,12 @@ from multipledispatch import dispatch
 
 
 class Agent:
-    def __init__(self, idx, cost_fn : CostFunction, phi : AggregationContributionFunction, init_state : np.array, local_constraint : Constraint = None):
+    def __init__(self, idx, cost_fn : CostFunction, phi : AggregationContributionFunction, init_state : np.ndarray, local_constraint : Constraint = None):
         self.idx = idx
         self.zz = init_state
         self._phi_obj = phi
         self._cost_fn_obj = cost_fn
         self.local_constraint = local_constraint
-
-        # print(f"[Agent-{idx}] init cond. = {self.zz}")
 
         # Tieni gli Agent slim e uniformi, e sposti tutta la variabilità dentro al runner, ma in modo più strutturato:
         # Agent ha un dizionario agent.buffers: dict[str, np.ndarray].

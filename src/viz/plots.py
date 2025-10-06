@@ -1,9 +1,8 @@
 import numpy as np
 import networkx as nx
+import matplotlib
 import matplotlib.pyplot as plt
-
-import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 class BaseRunResultPlotter:
     def __init__(self, result):
@@ -379,10 +378,11 @@ def show_and_wait(fig=None):
         fig.canvas.mpl_connect('key_press_event', close)
     plt.show(block=True)
 
+
 def plot_trajectory_plane_with_affine_constraint(result, a, b):
     """
     Plot the trajectory of (z1, z2) in the plane for N=2, d=1,
-    with a generic affine constraint a1*z1 + a2*z2 <= b.
+    highlighting the UNFEASIBLE region (in red).
 
     Parameters
     ----------
@@ -402,37 +402,48 @@ def plot_trajectory_plane_with_affine_constraint(result, a, b):
 
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    # plot trajectory
+    # trajectory
     ax.plot(z1, z2, 'b.-', label="Trajectory")
     ax.plot(z1[0], z2[0], 'go', label="Start")
     ax.plot(z1[-1], z2[-1], 'ro', label="End")
 
-    # build constraint line
+    # constraint line
     a1, a2 = a
-    x_vals = np.linspace(min(z1.min(), 0) - 0.1, max(z1.max(), 1) + 0.1, 300)
+    x_vals = np.linspace(-0.1, 1.1, 400)
 
     if abs(a2) > 1e-12:
-        # explicit form for z2
         y_vals = (b - a1 * x_vals) / a2
-        ax.plot(x_vals, y_vals, 'k--', label=f"{a1}*z1 + {a2}*z2 = {b}")
-        # fill feasible side
-        if a2 > 0:
-            ax.fill_between(x_vals, y_vals, y_vals.min()-1, color="gray", alpha=0.2, label="Feasible region")
-        else:
-            ax.fill_between(x_vals, y_vals, y_vals.max()+1, color="gray", alpha=0.2, label="Feasible region")
-    else:
-        # vertical line: a1*z1 = b
-        x_line = np.full_like(x_vals, b / a1)
-        ax.plot(x_line, x_vals, 'k--', label=f"{a1}*z1 = {b}")
-        if a1 > 0:
-            ax.axvspan(-1, b/a1, color="gray", alpha=0.2, label="Feasible region")
-        else:
-            ax.axvspan(b/a1, max(z1.max(),1)+1, color="gray", alpha=0.2, label="Feasible region")
+        ax.plot(x_vals, y_vals, 'k--', label=f"{a1}·z1 + {a2}·z2 = {b}")
 
-    ax.set_title("Trajectory in (z1, z2) plane with affine constraint")
+        # fill unfeasible region (where constraint violated)
+        if a2 > 0:
+            # region ABOVE the line is unfeasible
+            ax.fill_between(x_vals, y_vals, 1.1, color="red", alpha=0.2, label="Unfeasible region")
+        else:
+            # region BELOW the line is unfeasible
+            ax.fill_between(x_vals, y_vals, -0.1, color="red", alpha=0.2, label="Unfeasible region")
+    else:
+        # vertical constraint
+        x_line = np.full_like(x_vals, b / a1)
+        ax.plot(x_line, x_vals, 'k--', label=f"{a1}·z1 = {b}")
+
+        if a1 > 0:
+            ax.axvspan(b/a1, 1.1, color="red", alpha=0.2, label="Unfeasible region")
+        else:
+            ax.axvspan(-0.1, b/a1, color="red", alpha=0.2, label="Unfeasible region")
+
+    # box constraints
+    rect1 = matplotlib.patches.Rectangle((0.0, 0.0), 1, 1, color='black',  linestyle = 'dashed', fc = 'none', lw=1)
+    ax.add_patch(rect1)
+
+    # axes limits and style
+    ax.set_xlim(-0.1, 1.1)
+    ax.set_ylim(-0.1, 1.1)
     ax.set_xlabel("z1")
     ax.set_ylabel("z2")
+    ax.set_title("Trajectory in (z1, z2) plane with affine constraint")
     ax.grid(True, ls="--", alpha=0.6)
     ax.legend()
     plt.axis("equal")
     plt.show()
+

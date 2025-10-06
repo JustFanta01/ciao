@@ -21,7 +21,7 @@ class QuadraticCostFunction(CostFunction):
     """
     Simple quadratic cost function:
 
-        $$ \ell_i(z_i, \sigma(\textbf{z})) = \frac{1}{2} * ||z_i||^2 + \frac{1}{2} * ||\sigma(\textbf{z}) - c||^2 $$
+        $$ \ell_i(z_i, \sigma(\textbf{z})) = \frac{1}{2} ||z_i||^2 + \frac{1}{2} ||\sigma(\textbf{z}) - c||^2 $$
     """
 
     @dataclass

@@ -21,36 +21,38 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
         rng = np.random.default_rng(params.seed)
 
         A, b = self.problem.global_matrices()
+        # TODO: c = np.einsum('ijk,jk -> i', A, z) with A=(m,N,d) and z=(N,d)
+        # also 'm N ... , N ... -> m'
         
-        self.N = self.problem.N
-        self.d = self.problem.d              # tuple
-        n_tot = sum(ag["zz"].size for ag in self.problem.agents)
-        self.m = A.shape[0] # number of constraints per agent
+        N = self.problem.N
+        d = self.problem.d
+
+        m = A.shape[0] # number of constraints per agent
 
         assert A.shape[0] == b.shape[0], "A and b mismatch"
-        assert A.shape[1] == n_tot, "A has wrong number of columns"
+        assert A.shape[1] == N*d, "A has wrong number of columns"
 
         # [ collectors ]
-        collector_zz    = TrajectoryCollector("zz", K, (self.N,) + self.d)
-        collector_lamda = TrajectoryCollector("lambda", K, (self.m,))
+        collector_zz    = TrajectoryCollector("zz", K, (N,d))
+        collector_lamda = TrajectoryCollector("lambda", K, m)
         
         collector_cost  = TrajectoryCollector("cost", K, ())
-        collector_grad_f = TrajectoryCollector("total gradient of f(x)", K, (self.N,) + self.d)
+        collector_grad_f = TrajectoryCollector("total gradient of f(x)", K, (N,d))
         
         
         # $$ \nabla f_0(\mathbf{x}^*) + \sum_{i=1}^{m} \lambda_i \nabla f_i(\mathbf{x}^*) + \sum_{j=1}^{p} \nu_j \nabla h_j(\mathbf{x}^*) = 0$$
         
         # collector_KKT_stationarity = TrajectoryCollector("KKT stationarity", K, (n_tot,))
         
-        collector_grad_L_x = TrajectoryCollector("gradient of L(x,l) wrt. x", K, (n_tot,))
-        collector_grad_L_l = TrajectoryCollector("gradient of L(x,l) wrt. l", K, (self.m,))
-        collector_kkt = TrajectoryCollector("kkt", K, (3,))
-        collector_sigma = TrajectoryCollector("sigma", K, self.d)
+        collector_grad_L_x = TrajectoryCollector("gradient of L(x,l) wrt. x", K, (N,d))
+        collector_grad_L_l = TrajectoryCollector("gradient of L(x,l) wrt. l", K, m)
+        collector_kkt = TrajectoryCollector("kkt", K, 3)
+        collector_sigma = TrajectoryCollector("sigma", K, d)
 
         # [ init ]
-        self.lamda = np.zeros(self.m)
+        self.lamda = np.zeros(m)
         # self.lamda = -self.problem.global_residual()
-        assert self.lamda >= 0, "Negative lambda"
+        assert np.all(self.lamda >= 0), "Negative lambda"
 
         def lagrangian():
             # f(x) + (A@xx-b).T @ ll
@@ -58,53 +60,59 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
 
         for k in range(K):
             # [ snapshot ]
-            zz_k = np.concatenate([ np.copy(ag["zz"]) for ag in self.problem.agents] )
+            zz_k = np.zeros((N,d))
+            for i, ag in enumerate(self.problem.agents):
+                zz_k[i] = np.copy(ag["zz"])
+            assert zz_k.shape == (N,d), f"zz_k wrong shape {zz_k.shape}, expected {(N,d)}"
+            
             lamda_k = np.copy(self.lamda)
-            assert zz_k.shape == (n_tot,), f"zz_k wrong shape {zz_k.shape}, expected {(n_tot,)}"
             
             sigma = self.problem.sigma()
             # cost = self.problem.centralized_cost_fn() # $$ f(x)$$
             cost = lagrangian() # values at current iteration
 
+            # $$ \nabla f(x) $$
             grad_f_list = []
             for i, agent_i in enumerate(self.problem.agents):
                 grad_i_f = self.problem.centralized_gradient_of_cost_fn_of_agent(i) # shape: (d,)
                 grad_f_list.append(grad_i_f)
-            total_grad_f = np.concatenate(grad_f_list) # shape (N*d,)
-            assert total_grad_f.shape == (n_tot,), f"total_grad_f shape {total_grad_f.shape}, expected {(n_tot,)}"
+            total_grad_f = np.array(grad_f_list) # shape (N,d)
+            assert total_grad_f.shape == (N,d), f"total_grad_f shape {total_grad_f.shape}, expected {(N,d)}"
             
-            grad_constraints = np.zeros((n_tot,))
-            for i in range(self.m):
-                t = lamda_k[i] * A[i].T
-                assert t.shape == (n_tot,), f"t shape {t.shape}, expected {(n_tot,)}"
-                grad_constraints += t
-            total_grad_L_in_x = total_grad_f + grad_constraints
-            assert total_grad_L_in_x.shape == (n_tot,), f"total_grad_L_in_x shape {total_grad_L_in_x.shape}, expected {(n_tot,)}"
+            
+            # $$ \sum_{i=0}^{m} \lambda_i \nabla g(x) $$
+            
+            grad_lamda_times_constr = np.zeros((N*d,))
+            for i in range(m):
+                t = lamda_k[i] * A[i].T # scalar * (N*d,)
+                assert t.shape == (N*d,), f"t shape {t.shape}, expected {(N*d,)}"
+                grad_lamda_times_constr += t
+            
+            grad_lamda_times_constr = grad_lamda_times_constr.reshape((N,d))
+            total_grad_L_in_x = total_grad_f + grad_lamda_times_constr
+            assert total_grad_L_in_x.shape == (N,d), f"total_grad_L_in_x shape {total_grad_L_in_x.shape}, expected {(N,d)}"
             zz_k_plus_1 = zz_k - stepsize * (total_grad_L_in_x)
 
             # ------[ lamba update / gradient ascent ]------
-            violation = A @ zz_k - b
+            zz_k_flatten = zz_k.reshape((N*d,))
+            violation = A @ zz_k_flatten - b
             lambda_k_plus_1 = np.maximum(0.0, lamda_k + dual_stepsize * violation)
             
             total_grad_L_in_lamda = violation
-
-            # primal residual: r = A x - b
-            r = A @ zz_k - b
-            
+    
             # stationarity: ||∇f(x) + A^T λ||
-            stationarity = np.linalg.norm(total_grad_f + grad_constraints)
+            stationarity = np.linalg.norm(total_grad_f + grad_lamda_times_constr)
 
             # primal feasibility: ||(Ax - b)_+||_∞
-            primal_violation = np.max(np.maximum(r, 0.0))
+            primal_violation = np.max(np.maximum(violation, 0.0))
 
             # complementarity: max |λ_j * r_j| (max to highlight the "less satisfied constraint")
-            complementarity = np.max(np.abs(self.lamda * r))
+            complementarity = np.max(np.abs(self.lamda * violation))
 
             # ------[ collector ]------
-            collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
+            collector_zz.log(k, zz_k)
             collector_cost.log(k, cost)
-            _total_grad_f = total_grad_f.reshape((self.N,) + self.d)
-            collector_grad_f.log(k, _total_grad_f)
+            collector_grad_f.log(k, total_grad_f)
             collector_lamda.log(k, self.lamda)
             collector_sigma.log(k, sigma)
             collector_grad_L_x.log(k, total_grad_L_in_x)
@@ -112,11 +120,8 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
             collector_kkt.log(k, np.array([stationarity, primal_violation, complementarity], dtype=float))
             
             # ------[ writeback ]------
-            off = 0
-            for ag in self.problem.agents:
-                d_i = ag.zz.size
-                ag["zz"] = zz_k_plus_1[off:off+d_i].reshape(ag["zz"].shape)
-                off += d_i
+            for i, ag in enumerate(self.problem.agents):
+                ag["zz"] = zz_k_plus_1[i]
             self.lamda = lambda_k_plus_1
 
         result = RunResult(

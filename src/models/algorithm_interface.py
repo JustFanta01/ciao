@@ -57,14 +57,14 @@ class TrajectoryCollector:
                scalare -> shape=()
         """
         self.name = name
-        self.shape = tuple(shape) 
-        self.data = np.zeros((max_iter,) + self.shape)
+        self.shape = shape if type(shape)==tuple else (shape, )
+        self.data = np.zeros((max_iter, ) + self.shape)
 
     def log(self, k, value):
         arr = np.asarray(value)
 
         # Se il collector è scalare, consenti (,) oppure (1,) ecc.
-        if self.shape == ():
+        if self.shape == 1:
             if arr.shape == ():
                 self.data[k] = arr
                 return

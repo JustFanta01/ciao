@@ -19,11 +19,11 @@ class AggregativeTracking(Algorithm):
         d = self.problem.d # tuple!
         
         # [ define collectors ]
-        collector_zz = TrajectoryCollector("zz", max_iter, (N,) + d)
+        collector_zz = TrajectoryCollector("zz", max_iter, (N,d))
 
-        collector_ss = TrajectoryCollector("ss", max_iter, (N,) + d) # proxy of $$\sigma(\textbf{z}^k)$$
+        collector_ss = TrajectoryCollector("ss", max_iter, (N,d)) # proxy of $$\sigma(\textbf{z}^k)$$
         
-        collector_vv = TrajectoryCollector("vv", max_iter, (N,) + d) # proxy of $$\frac{1}{N}\sum_{j=1}^{N}\nabla_2\ell_j(z_j^k, \sigma(\textbf{z}^k))$$
+        collector_vv = TrajectoryCollector("vv", max_iter, (N,d)) # proxy of $$\frac{1}{N}\sum_{j=1}^{N}\nabla_2\ell_j(z_j^k, \sigma(\textbf{z}^k))$$
         
         collector_cost = TrajectoryCollector("cost", max_iter, ())
         collector_grad = TrajectoryCollector("grad", max_iter, d)
@@ -44,9 +44,9 @@ class AggregativeTracking(Algorithm):
             total_grad = np.zeros(d)
 
             # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1} $$
-            zz_k_plus_1 = np.zeros((N,) + d)
-            ss_k_plus_1 = np.zeros((N,) + d)
-            vv_k_plus_1 = np.zeros((N,) + d)
+            zz_k_plus_1 = np.zeros((N,d))
+            ss_k_plus_1 = np.zeros((N,d))
+            vv_k_plus_1 = np.zeros((N,d))
 
             for i, agent_i in enumerate(self.problem.agents):
                 # NOTE: usage of the tracker ss instead of sigma
