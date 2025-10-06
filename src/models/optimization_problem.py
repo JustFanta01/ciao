@@ -118,8 +118,8 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         self.B_global = np.hstack(B_list)                   # shape (m, N*d)
         self.b_global = np.sum(b_list, axis=0)              # shape (m, 1)
 
-        assert self.B_global.shape == (m, self.N*self.d)
-        assert self.b_global.shape == (m,)
+        assert self.B_global.shape == (m, self.N*self.d), "" f"B_global.shape was {self.B_global.shape}, expected {(m, self.N*self.d)}"
+        assert self.b_global.shape == (m,), f"b_global.shape was {self.b_global.shape}, expected {(m,)}"
 
         print(self.B_global)
         print(self.b_global)

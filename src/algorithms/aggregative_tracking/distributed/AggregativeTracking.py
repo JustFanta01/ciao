@@ -16,7 +16,7 @@ class AggregativeTracking(Algorithm):
         seed = params.seed
         
         N = self.problem.N
-        d = self.problem.d # tuple!
+        d = self.problem.d
         
         # [ define collectors ]
         collector_zz = TrajectoryCollector("zz", max_iter, (N,d))
