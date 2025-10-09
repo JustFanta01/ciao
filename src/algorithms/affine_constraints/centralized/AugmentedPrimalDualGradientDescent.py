@@ -145,6 +145,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
             # zz_k_plus_1 = zz_k - stepsize * (total_grad_f + A.T @ s_k)
 
             zz_k_plus_1 = zz_k - stepsize * (total_grad_f + H_nabla_1)
+            zz_k_plus_1 = np.clip(zz_k_plus_1, 0, 1)   # apply constraint [0,1]
 
             # ------[ lamba update / gradient ascent ]------
             # $$\eta$$ time constant for dual (absorbed in dual_stepsize?)
@@ -219,7 +220,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
 
         result = RunResult(
             zz_traj = collector_zz.get(),
-            grad_traj = collector_grad_f.get(),
+            grad_traj = collector_grad_f.get(), # TODO: quello di f?
             cost_traj = collector_cost.get(),
             aux = {
                 "sigma_traj": collector_sigma.get(),

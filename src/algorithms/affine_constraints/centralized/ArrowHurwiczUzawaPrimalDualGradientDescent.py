@@ -92,6 +92,7 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
             total_grad_L_in_x = total_grad_f + grad_lamda_times_constr
             assert total_grad_L_in_x.shape == (N,d), f"total_grad_L_in_x shape {total_grad_L_in_x.shape}, expected {(N,d)}"
             zz_k_plus_1 = zz_k - stepsize * (total_grad_L_in_x)
+            zz_k_plus_1 = np.clip(zz_k_plus_1, 0, 1)   # apply constraint [0,1]
 
             # ------[ lamba update / gradient ascent ]------
             zz_k_flatten = zz_k.reshape((N*d,))

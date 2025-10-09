@@ -38,13 +38,13 @@ class OptimizationProblem():
             cost += agent_i.cost_fn(s) # $$ \ell_i(z_i, \sigma(\textbf{z})) $$
         return cost
 
-    def centralized_gradient(self):
+    def centralized_gradient(self) -> np.ndarray:
         
         # $$ \nabla \ell(z, \sigma(z)) = \sum_{i=0}^{N} \nabla \ell_i(z_i, \sigma (z)) $$
 
-        total_gradient = np.zeros(self.d)
-        for i, agent_i in enumerate(self.problem.agents):
-            total_gradient += self.centralized_gradient_of_agent(i)
+        total_gradient = np.zeros((self.N, self.d))
+        for i, agent_i in enumerate(self.agents):
+            total_gradient[i] = self.centralized_gradient_of_cost_fn_of_agent(i)
 
         return total_gradient
         
@@ -121,8 +121,6 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         assert self.B_global.shape == (m, self.N*self.d), "" f"B_global.shape was {self.B_global.shape}, expected {(m, self.N*self.d)}"
         assert self.b_global.shape == (m,), f"b_global.shape was {self.b_global.shape}, expected {(m,)}"
 
-        print(self.B_global)
-        print(self.b_global)
         # [ N=5, d=2, m=3
         #  [0. 0. 1. 1. 2. 2. 3. 3. 4. 4.]
         #  [0. 0. 1. 1. 2. 2. 3. 3. 4. 4.]
