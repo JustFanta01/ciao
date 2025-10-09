@@ -155,21 +155,33 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
             ax.set_title("Lambda trajectory (missing in aux)")
             return self
         lamda = self.result.aux["lambda_traj"]
-        K, m = lamda.shape
-        
-        for j in range(m):
-            if semilogy:
-                ax.semilogy(np.arange(K), lamda[:, j], label=f"dim {j}")
-            else:
-                ax.plot(np.arange(K), lamda[:, j], label=f"dim {j}")
-        
-        ax.set_title("Lambda evolution")
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Lambda")
-        ax.grid(True, which="both", ls="--", alpha=0.6)
-        ax.legend()
-
-        return self
+        if len(lamda.shape) == 2: # (K, m)
+            K, m = lamda.shape
+            for j in range(m):
+                if semilogy:
+                    ax.semilogy(np.arange(K), lamda[:, j], label=f"dim {j}")
+                else:
+                    ax.plot(np.arange(K), lamda[:, j], label=f"dim {j}")
+            ax.set_title("Lambda evolution")
+            ax.set_xlabel("Iteration")
+            ax.set_ylabel("Lambda")
+            ax.grid(True, which="both", ls="--", alpha=0.6)
+            ax.legend()
+            return self
+        elif len(lamda.shape) == 3: # (K, N, m)
+            K, N, m = lamda.shape
+            for i in range(N):
+                if m == 1:
+                    ax.plot(np.arange(K), lamda[:, i, 0], label=f"Agent {i+1}")
+                else:
+                    for j in range(m):
+                        ax.plot(np.arange(K), lamda[:, i, j], label=f"Agent {i+1}, dim {j}")
+            ax.set_title("Lambda evolutions")
+            ax.set_xlabel("Iteration")
+            ax.set_ylabel("Lambda Tracker")
+            ax.grid(True, which="both", ls="--", alpha=0.6)
+            ax.legend()
+            return self
 
     def plot_kkt_conditions(self, semilogy=True):
         """
@@ -224,6 +236,67 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
     #     ax.legend()
 
     #     return self
+
+    def plot_aux(self, semilogy=True):
+        ax = self.axes[1, 2]
+        if "aa_traj" not in self.result.aux:
+            ax.set_title("Aux var. 'aa' trajectory (missing in aux)")
+            return self
+        aa = self.result.aux["aa_traj"]
+        K, N, m = aa.shape
+        for i in range(N):
+            if m == 1:
+                ax.plot(np.arange(K), aa[:, i, 0], label=f"Agent {i+1}")
+            else:
+                for j in range(m):
+                    ax.plot(np.arange(K), aa[:, i, j], label=f"Agent {i+1}, dim {j}")
+        ax.set_title("Aux var. evolutions")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Aux var 'aa'")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+        return self
+
+
+# def plot_feasibility(self, semilogy=True):
+#     ax = self.axes[2, 1]
+#     if "kkt_traj" not in self.result.aux:
+#         ax.set_title("Feasibility (missing kkt_traj)")
+#         return self
+#     kkt = self.result.aux["kkt_traj"]  # (K,3): [stationarity, primal_violation, complementarity]
+#     K = kkt.shape[0]
+#     names = ["Primal violation ||(Az-b)_+||_∞", "Complementarity max|λ⊙r|"]
+#     series = [kkt[:,1], kkt[:,2]]
+#     for s, name in zip(series, names):
+#         if semilogy: ax.semilogy(np.arange(K), s, label=name)
+#         else:        ax.plot(np.arange(K), s, label=name)
+#     ax.set_title("Feasibility / Complementarity")
+#     ax.set_xlabel("Iteration"); ax.set_ylabel("Value")
+#     ax.grid(True, which="both", ls="--", alpha=0.6); ax.legend()
+#     return self
+
+
+    def plot_consensus_error(self, keys, semilogy=True):
+        ax = self.axes[2, 1]
+        for key in keys:
+            if key not in self.result.aux:
+                ax.set_title("{key} trajectory (missing in aux)")
+                return self
+            val = self.result.aux[key]
+            K, N, d = val.shape
+            val_bar = np.mean(val, axis=1)
+            for i in range(N):
+                if semilogy:
+                    ax.semilogy(np.arange(K), np.linalg.norm(val[:, i] - val_bar, axis=1), label=f"{key} agent {i+1}")
+                else:
+                    ax.plot(np.arange(K), np.linalg.norm(val[:, i] - val_bar, axis=1), label=f"{key} agent {i+1}")
+        
+        ax.set_title(f"{keys}\n consensus error (val_i[k] - avg(val[k]))")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel(f"{keys}")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+        return self
 
 # ---------------- Graph visualization ----------------
 def show_graph_and_adj_matrix(fig, axs, graph, adj_matrix=None):
@@ -379,10 +452,7 @@ def show_and_wait(fig=None):
     plt.show(block=True)
 
 
-import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib.patches import Patch
-
 def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12):
     """
     Plot the trajectory of (z1, z2) for N=2, d=1, with multiple affine constraints.

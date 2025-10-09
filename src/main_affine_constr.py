@@ -6,6 +6,7 @@ from typing import Optional
 
 from models.algorithm_interface import RunResult
 from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent, ArrowHurwiczUzawaPrimalDualGradientDescent
+from algorithms.affine_constraints.distributed import DuMeng
 from models.phi import IdentityFunction
 from models.optimization_problem import AffineCouplingProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -17,11 +18,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from utils import graph_utils
 
 import numpy as np
-
-# Units:
-# - MFLOPs (1e6 FLOPs)
-# - MB     (1e6 bytes)
-# - seconds
 
 def generate_B_b_simple(
     # Per-agent params (shape (N,))
@@ -97,10 +93,9 @@ def generate_B_b_simple(
 
     return B_list, b_list, b_sum   
 
-
 def main():
     N = 2  # number of agents
-    m = 3  # number of affine constraints per agent, B_i is a matrix (m,d)
+    m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
@@ -153,6 +148,7 @@ def main():
                 alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
             )
             cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            
             # cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
             # cost_fn = QuadraticCostFunction(cost_params)
             
@@ -217,14 +213,14 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    if True:
+    if False:
         problem = setup_problem()
         centralized = ArrowHurwiczUzawaPrimalDualGradientDescent(problem)
         args = {
             "max_iter": 2500, 
-            "stepsize": 0.01,
+            "stepsize": 0.001,
             "seed": seed,
-            "dual_stepsize": 0.01
+            "dual_stepsize": 0.001
         }
         algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
         result = centralized.run(algo_params)
@@ -253,18 +249,41 @@ def main():
     # -----------------------
     # |     DISTRIBUTED     |
     # -----------------------
-    # problem = setup_problem()
-    # distributed = DistributedAggregativeTracking(problem)
-    # algo_params = DistributedAggregativeTracking.AlgorithmParams(max_iter=500, stepsize=0.01, seed=seed)
-    # result = distributed.run(algo_params)
+    if True:
+        problem = setup_problem()
+        distributed = DuMeng(problem)
+        args = {
+            "max_iter": 2500, 
+            "stepsize": 0.01,
+            "seed": seed,
+            "beta": 0.05,
+            "gamma": 0.05
+        }
+        algo_params = DuMeng.AlgorithmParams(**args)
+        result = distributed.run(algo_params)
 
-    # plotter = plots.RunResultPlotter(result, semilogy=True)
-    # plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
-    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+        i1, i2 = 0, 1  # indices of the agents you want to visualize
+        constraints = [
+            ((B_list[i1][k, 0], B_list[i2][k, 0]), b_list[i1][k] + b_list[i2][k])
+            for k in range(B_list[i1].shape[0])
+        ]
+        plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
 
-    # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!
-    # sbar_bias = np.linalg.norm(np.mean(ss_distr[-1, :, 0]) - np.mean(zz_distr[-1, :, 0]))
-    # print(f"[CHECK] s-tracker bias on zbar: {sbar_bias:.3e}")
+        result.summary()
+
+        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_lambda(semilogy=False)\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .plot_aux()\
+            .plot_Lagr_stationarity()\
+            .plot_kkt_conditions(semilogy=False)\
+            .plot_consensus_error(["lambda_traj", "sigma_traj"])\
+            .show()
+        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
 
 if __name__ == "__main__":
