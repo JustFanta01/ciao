@@ -73,6 +73,7 @@ class CentralizedGradientMethod(Algorithm):
                 agent_i["zz"] = zz_k_plus_1[i]
 
         result = RunResult(
+            algorithm_name=type(self).__name__,
             zz_traj=collector_zz.get(),
             cost_traj=collector_cost.get(), 
             grad_traj=collector_grad.get(),

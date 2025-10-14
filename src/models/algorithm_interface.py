@@ -7,6 +7,7 @@ from .optimization_problem import OptimizationProblem
 
 @dataclass
 class RunResult:
+    algorithm_name: str
     zz_traj: np.ndarray      # (K, N, d)
     grad_traj: np.ndarray    # (K, d)
     cost_traj: np.ndarray    # (K,)
@@ -17,7 +18,7 @@ class RunResult:
         """
         Print last values of cost, gradients, agent states and aux variables.
         """
-        print("=== Final RunResult Summary ===")
+        print(f"=== [{self.algorithm_name}] Final RunResult Summary ===")
 
         # cost trajectory
         if self.cost_traj is not None and len(self.cost_traj) > 0:

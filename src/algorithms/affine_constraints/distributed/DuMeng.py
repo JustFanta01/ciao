@@ -26,7 +26,24 @@ class DuMeng(Algorithm):
         m = self.problem.m
 
         BB, bb = self.problem.global_matrices()
-        
+
+        def augmented_lagrangian(ll_k, zz_k):
+            lapl = 0.5 * (np.eye(N) - self.problem.adj)
+            lapl = np.kron(lapl, np.eye(m))
+
+            # $$ L(z,\lambda) = \ell(z) + \sum_{i=0}^{m}\lambda_i g_i(z) - \frac{1}{2} \lambda^T L^2 \lambda $$
+            
+            # for the "constr", lambda should be (m,1)
+            # for the "regularizer", lambda should be (N*m, 1)
+            cost_f = self.problem.centralized_cost_fn()
+            
+            # using the mean at that iteration to compute the global constraint violation
+            ll_k_bar = np.mean(ll_k.reshape((N,m)), axis=0)
+            constr = ll_k_bar.T @ (BB @ zz_k - bb)
+            regularizer = - 0.5 * ll_k.T @ lapl @ ll_k
+            return cost_f + constr + regularizer
+
+
         # [ define collectors ]
         collector_zz = TrajectoryCollector("zz", K, (N,d)) # decision variable
 
@@ -38,7 +55,7 @@ class DuMeng(Algorithm):
 
         collector_ll = TrajectoryCollector("ll", K, (N,m)) # $\lambda^k$
         
-        collector_cost = TrajectoryCollector("cost", K, ())
+        collector_cost = TrajectoryCollector("cost", K, (2,))
         
 
         collector_grad_ell = TrajectoryCollector("total gradient of l(x)", K, (N,d))
@@ -81,7 +98,7 @@ class DuMeng(Algorithm):
             # point of view of agent-i
             for i, agent_i in enumerate(self.problem.agents):
 
-                cost_i = agent_i.cost_fn(agent_i["zz"], agent_i["ss"])
+                cost_i = agent_i.cost_fn(agent_i["zz"], agent_i["ss"]) # $$\ell_i(z_i^k, s_i^k), s_i^k \text{ tracker of } \sigma(z) $$
     
                 # [ local constraint matrices ]
                 B_i, b_i = agent_i.local_constraint.matrices()
@@ -116,7 +133,7 @@ class DuMeng(Algorithm):
                 vv_k = np.array([ag["vv"] for ag in self.problem.agents]) # (N,d)
                 vv_consensus = vv_k.T @ adj_i.T # (d,N)x(N,1)=(d,1)
                 nabla_2_k = agent_i.nabla_2(agent_i["zz"], agent_i["ss"])
-                nabla_2_k_plus_1 = agent_i.nabla_2(zz_k_plus_1[i], ss_k_plus_1[i])
+                nabla_2_k_plus_1 = agent_i.nabla_2(zz_k_plus_1[i], ss_k_plus_1[i]) # $$ \nabla_2 f_i(z_i^{k+1}, s_i^{k+1}) - \nabla_2 f_i(z_i^{k}, s_i^{k})  $$
                 vv_local_innovation = nabla_2_k_plus_1 - nabla_2_k
                 vv_k_plus_1[i] = vv_consensus + vv_local_innovation
 
@@ -124,35 +141,40 @@ class DuMeng(Algorithm):
                 
                 # $$ v_i^{k+1} = v_i^{k} - \gamma \sum_{j=0}^{N}r_{ij} v_{j}^k - \sum_{j=0}^{N}r_{ij}(\lambda_j^k - \lambda_j^{k-1}) + (\lambda_i^k - \lambda_i^{k-1}) + \beta B_i(w_i^{k+1} - w_i^{k}) $$
                 
-                aa_k = np.array([ag["aa"] for ag in self.problem.agents])
+                aa_k         = np.array([ag["aa"] for ag in self.problem.agents])
                 ll_k_minus_1 = np.array([ag["llm1"] for ag in self.problem.agents])
-                ll_k = np.array([ag["ll"] for ag in self.problem.agents])
+                ll_k         = np.array([ag["ll"] for ag in self.problem.agents])
                 aa_consensus = aa_k.T @ rr_i.T # (m,N)x(N,1)=(m,1)
                 ll_diff_consensus = (ll_k - ll_k_minus_1).T @ rr_i.T
                 ll_innovation = agent_i["ll"] - agent_i["llm1"]
                 zz_innovation = zz_k_plus_1[i] - agent_i["zz"]
-                aa_k_plus_1[i] = agent_i["aa"] - gamma * aa_consensus - ll_diff_consensus + ll_innovation + beta * B_i @ zz_innovation
+                aa_k_plus_1[i]  = agent_i["aa"] - gamma * aa_consensus \
+                                - ll_diff_consensus + ll_innovation\
+                                + beta * (B_i @ zz_innovation)
 
                 # [ ll update ]
                 
-                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m[v_i^{k+1}]} $$
+                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[v_i^{k+1}] $$
                 
-                ll_k_plus_1[i] = np.maximum(np.zeros(m), aa_k_plus_1[i])
+                ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
 
                 total_cost += cost_i
                 
                 total_grad_ell[i] = grad_ell
-                total_grad_L_in_z[i] = grad_L_in_z
+                total_grad_L_in_z[i] = grad_L_in_z # (N,d)
 
             # global primal residual: r = A x - b
             zz_k_flat = np.array([ag["zz"] for ag in self.problem.agents]).reshape((N*d,))
-            r = BB @ zz_k_flat - bb
+            r = BB @ zz_k_flat - bb # (m,)
             total_grad_L_in_l = r
             
             # stationarity: ||∇f(x) + A^T λ||
             ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
+            ll_k_flat = ll_k.reshape((N*m,))
             ll_bar = np.mean(ll_k, axis=0) # TODO: la media?
-            stationarity = np.linalg.norm(total_grad_ell.reshape(-1) + BB.T @ ll_bar)
+            # BB.T @ ll_bar
+            # eq (10a): $$ \mathbf{0} = \nabla_1 f(w^*, z^*) + \nabla h(w^*)\mu^* + \Lambda^T\lambda^* $$
+            stationarity = np.linalg.norm(total_grad_ell.reshape(-1) + self.problem.B_local.T @ ll_k_flat)
 
             # primal feasibility: ||(Ax - b)_+||_∞
             primal_violation = np.max(np.maximum(r, 0.0))
@@ -162,7 +184,8 @@ class DuMeng(Algorithm):
     
             # [ collector ]
             #  -- cost
-            collector_cost.log(k, total_cost)
+            cost = augmented_lagrangian(ll_k_flat, zz_k_flat)
+            collector_cost.log(k, np.array([total_cost, cost]))
             
             #  -- states
             collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
@@ -189,6 +212,7 @@ class DuMeng(Algorithm):
                 agent_i["ll"] = ll_k_plus_1[i]
 
         return RunResult (
+            algorithm_name=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_ell.get(),
             cost_traj = collector_cost.get(),

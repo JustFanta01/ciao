@@ -126,6 +126,7 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
             self.lamda = lambda_k_plus_1
 
         result = RunResult(
+            algorithm_name=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_f.get(),
             cost_traj = collector_cost.get(),

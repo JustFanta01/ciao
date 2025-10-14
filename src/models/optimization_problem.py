@@ -112,8 +112,8 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         # number of constraints
         m = B_list[0].shape[0]
         
-        # self.B_local = self._block_diag(B_list)         # shape: (N*m, N*d)
-        # self.b_local = np.concatenate(b_list, axis=0)   # shape: (N*m, 1)
+        self.B_local = self._block_diag(B_list)         # shape: (N*m, N*d)
+        self.b_local = np.concatenate(b_list, axis=0)   # shape: (N*m, 1)
         
         self.B_global = np.hstack(B_list)                   # shape (m, N*d)
         self.b_global = np.sum(b_list, axis=0)              # shape (m, 1)

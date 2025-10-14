@@ -129,28 +129,34 @@ def main():
     BWcloud_GBps = 3
     Mem_cloud_GB = 3
 
-    B_list, b_list, b_sum = generate_B_b_simple(
-        W_nom_GF=W_nom_GF[0:N],
-        M_job_GB=M_job_GB[0:N],
-        S_GB=S_GB[0:N],
-        gamma_GB_per_GF=gamma_GB_per_GF[0:N],
-        T=T,
-        Pcloud_GFps=Pcloud_GFps,
-        Mem_cloud_GB=Mem_cloud_GB,
-        BWcloud_GBps=BWcloud_GBps,
-        equal_split=True  # set False and pass w_* to customize splits
-    )
+    # B_list, b_list, b_sum = generate_B_b_simple(
+    #     W_nom_GF=W_nom_GF[0:N],
+    #     M_job_GB=M_job_GB[0:N],
+    #     S_GB=S_GB[0:N],
+    #     gamma_GB_per_GF=gamma_GB_per_GF[0:N],
+    #     T=T,
+    #     Pcloud_GFps=Pcloud_GFps,
+    #     Mem_cloud_GB=Mem_cloud_GB,
+    #     BWcloud_GBps=BWcloud_GBps,
+    #     equal_split=True  # set False and pass w_* to customize splits
+    # )
+
+    B_list = np.ones((N,m,d))
+    # B_list[0] = np.array([[[0.5]]])
+    # B_list[1] = np.array([[[0.25]]])
+    b_list = np.ones((N,m)) * 0.25
 
     def setup_problem():
         agents = []
         for i in range(N):
-            cost_params = LocalCloudTradeoffCostFunction.CostParams(
-                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            )
-            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
+            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            # )
+            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
-            # cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
-            # cost_fn = QuadraticCostFunction(cost_params)
+            
+            cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
+            cost_fn = QuadraticCostFunction(cost_params)
             
             lc = LinearConstraint(B_list[i], b_list[i])
 
@@ -175,7 +181,7 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    if True:
+    if False:
         problem = setup_problem()
 
         centralized = AugmentedPrimalDualGradientDescent(problem)
@@ -204,7 +210,7 @@ def main():
             .plot_grad_norm()\
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_Lagr_stationarity()\
+            .plot_lagr_stationarity()\
             .plot_kkt_conditions(semilogy=False)\
             .plot_lambda(semilogy=False)\
             .show()
@@ -240,7 +246,7 @@ def main():
             .plot_grad_norm()\
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_Lagr_stationarity()\
+            .plot_lagr_stationarity()\
             .plot_kkt_conditions(semilogy=False)\
             .plot_lambda(semilogy=False)\
             .show()
@@ -254,10 +260,10 @@ def main():
         distributed = DuMeng(problem)
         args = {
             "max_iter": 2500, 
-            "stepsize": 0.01,
+            "stepsize": 0.006,
             "seed": seed,
-            "beta": 0.05,
-            "gamma": 0.05
+            "beta": 0.005,
+            "gamma": 0.01
         }
         algo_params = DuMeng.AlgorithmParams(**args)
         result = distributed.run(algo_params)
@@ -267,9 +273,10 @@ def main():
             ((B_list[i1][k, 0], B_list[i2][k, 0]), b_list[i1][k] + b_list[i2][k])
             for k in range(B_list[i1].shape[0])
         ]
+        result.summary()
+
         plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
 
-        result.summary()
 
         plotter = plots.ConstrainedRunResultPlotter(result)
         plotter\
@@ -279,9 +286,9 @@ def main():
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
             .plot_aux()\
-            .plot_Lagr_stationarity()\
+            .plot_lagr_stationarity()\
             .plot_kkt_conditions(semilogy=False)\
-            .plot_consensus_error(["lambda_traj", "sigma_traj"])\
+            .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
             .show()
         # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 

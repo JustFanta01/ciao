@@ -93,6 +93,7 @@ class AggregativeTracking(Algorithm):
             collector_grad.log(k, total_grad)
 
         return RunResult (
+            algorithm_name = type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad.get(),
             cost_traj = collector_cost.get(),

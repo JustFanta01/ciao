@@ -117,7 +117,26 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
         self.fig, self.axes = plt.subplots(3, 3, figsize=(12, 8))
         self.fig.tight_layout(pad=4.0)
 
-    def plot_Lagr_stationarity(self, semilogy=True):
+    def plot_cost(self, semilogy=True):
+        cost = self.result.cost_traj
+        K = cost.shape[0]
+        cost_f = cost[:,0]
+        cost_L = cost[:,1]
+        ax = self.axes[0, 0]
+        if semilogy:
+            ax.semilogy(np.arange(K), np.abs(cost_f), label="Cost function ")
+            ax.semilogy(np.arange(K), np.abs(cost_L), label="Cost Lagrangian")
+        else:
+            ax.plot(np.arange(K), cost_f, label="Cost")
+            ax.plot(np.arange(K), cost_L, label="Cost")
+        ax.set_title("Cost evolution")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Cost")
+        ax.grid(True, which="both", ls="--", alpha=0.6)
+        ax.legend()
+        return self
+
+    def plot_lagr_stationarity(self, semilogy=True):
         """
         Plot the norms of grad L wrt x and grad L wrt lambda.
         Requires that result.aux contains 'grad_L_x_traj' and 'grad_L_l_traj'.
@@ -130,16 +149,21 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
         grad_L_x = self.result.aux["grad_L_x_traj"]  # shape (K, n_tot)
         grad_L_l = self.result.aux["grad_L_l_traj"]  # shape (K, m)
 
-        K = grad_L_x.shape[0]
-        norm_x = np.linalg.norm(grad_L_x, axis=1)
-        norm_l = np.linalg.norm(grad_L_l, axis=1)
-
+        grad_L_x_dim = len(grad_L_x.shape)
+        grad_L_l_dim = len(grad_L_l.shape)
+        # the norm of the whole matrix / vector present at each iteration
+        # so if grad.shape = (K, N, d1, d2, d3)
+        # grad_norm[k] is the norm of the (N, d1, d2, d3) matrix at grad[k]
+        grad_L_x_norm = np.linalg.norm(grad_L_x, axis=tuple(range(1, grad_L_x_dim)))
+        grad_L_l_norm = np.linalg.norm(grad_L_l, axis=tuple(range(1, grad_L_l_dim)))
+        K = grad_L_x_norm.shape[0]
+        
         if semilogy:
-            ax.semilogy(np.arange(K), norm_x, label="||∇_x L(x,λ||")
-            ax.semilogy(np.arange(K), norm_l, label="||∇_λ L(x,λ)||")
+            ax.semilogy(np.arange(K), grad_L_x_norm, label="||∇_x L(x,λ||")
+            ax.semilogy(np.arange(K), grad_L_l_norm, label="||∇_λ L(x,λ)||")
         else:
-            ax.plot(np.arange(K), norm_x, label="||∇_x L(x,λ)||")
-            ax.plot(np.arange(K), norm_l, label="||∇_λ L(x,λ)||")
+            ax.plot(np.arange(K), grad_L_x_norm, label="||∇_x L(x,λ)||")
+            ax.plot(np.arange(K), grad_L_l_norm, label="||∇_λ L(x,λ)||")
 
         ax.set_title("Norm of ∇1 and ∇2 of L(x,λ)")
         ax.set_xlabel("Iteration")
@@ -291,7 +315,7 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
                 else:
                     ax.plot(np.arange(K), np.linalg.norm(val[:, i] - val_bar, axis=1), label=f"{key} agent {i+1}")
         
-        ax.set_title(f"{keys}\n consensus error (val_i[k] - avg(val[k]))")
+        ax.set_title(f"consensus error (val_i[k] - avg(val[k]))")
         ax.set_xlabel("Iteration")
         ax.set_ylabel(f"{keys}")
         ax.grid(True, which="both", ls="--", alpha=0.6)
@@ -514,7 +538,7 @@ def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12
     # Shade UNFEASIBLE region (union of all violations)
     # Use contourf with two levels (0: feasible, 1: unfeasible)
     Z = violated.astype(int)
-    ax.contourf(X, Y, Z, levels=[0.5, 1.5], colors=["red"], alpha=0.18, linewidths=0)
+    ax.contourf(X, Y, Z, levels=[0.5, 1.5], colors=["red"], alpha=0.18)
 
     # Legend: add a proxy for the red region
     red_patch = Patch(facecolor='red', alpha=0.18, label='Unfeasible region')
