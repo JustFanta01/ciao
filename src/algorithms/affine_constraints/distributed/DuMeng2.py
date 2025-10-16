@@ -3,7 +3,7 @@ from models.algorithm_interface import RunResult, Algorithm, TrajectoryCollector
 from models.optimization_problem import ConstrainedOptimizationProblem
 from typing import cast
 
-class DuMeng(Algorithm):
+class DuMeng2(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
         def __init__(self, max_iter: int, stepsize: float, seed: int, beta: float, gamma: float):
             super().__init__(max_iter, stepsize, seed)
@@ -52,6 +52,7 @@ class DuMeng(Algorithm):
         collector_vv = TrajectoryCollector("vv", K, (N,d)) # proxy of $$\frac{1}{N}\sum_{j=1}^{N}\nabla_2\ell_j(z_j^k, \sigma(\textbf{z}^k))$$
         
         collector_aa = TrajectoryCollector("aa", K, (N,m)) # aux
+        collector_nn = TrajectoryCollector("nn", K, (N,m)) # aux
 
         collector_ll = TrajectoryCollector("ll", K, (N,m)) # $\lambda^k$
         
@@ -77,9 +78,12 @@ class DuMeng(Algorithm):
             # [ init aa ]
             agent_i["aa"] = np.zeros(m) # $$ a_i^0 = \mathbf{0} $$
 
+            # [ init nn ]
+            agent_i["nn"] = np.zeros(m)
+
             # [ init ll ]
-            agent_i["llm1"] = np.zeros(m) # $$ \lambda_i^{-1} = \mathbf{0} $$
-            agent_i["ll"] = np.zeros(m) # $$ \lambda_i^0 = \mathbf{0}, \ \text{arbitrarily}$$
+            agent_i["llm1"] = np.zeros(m) # $$ \lambda_i^{-1} = \mathbf{0}$$
+            agent_i["ll"] = np.zeros(m) # $$ \lambda_i^0 = \mathbf{0}$$
 
         for k in range(K):
             total_cost = 0
@@ -92,6 +96,7 @@ class DuMeng(Algorithm):
             ss_k_plus_1 = np.zeros((N,d))
             vv_k_plus_1 = np.zeros((N,d))
             aa_k_plus_1 = np.zeros((N,m))
+            nn_k_plus_1 = np.zeros((N,m))
             ll_k_plus_1 = np.zeros((N,m))
             
 
@@ -144,31 +149,37 @@ class DuMeng(Algorithm):
                 vv_k_plus_1[i] = vv_consensus + vv_local_innovation
 
                 # [ aa update ]
+
+                # $$ a_i^{k+1} = \lambda_i^{k} + \beta (B_i z_i^k - b_i) + n_i^k  $$
+
+                aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ agent_i["zz"] - b_i) + agent_i["nn"]
+
+
+                # [ nn update ]
                 
-                # $$ v_i^{k+1} = v_i^{k} - \gamma \sum_{j=0}^{N}r_{ij} v_{j}^k - \sum_{j=0}^{N}r_{ij}(\lambda_j^k - \lambda_j^{k-1}) + (\lambda_i^k - \lambda_i^{k-1}) + \beta B_i(w_i^{k+1} - w_i^{k}) $$
+                aa_k = np.array([ag["aa"] for ag in self.problem.agents])       # (N, m)
+                ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
+                ll_k_minus_1 = np.array([ag["llm1"] for ag in self.problem.agents])       # (N, m)
                 
-                aa_k         = np.array([agent_j["aa"]      for agent_j in self.problem.agents])   # (N,m)
-                ll_k_minus_1 = np.array([agent_j["llm1"]    for agent_j in self.problem.agents])   # (N,m)
-                ll_k         = np.array([agent_j["ll"]      for agent_j in self.problem.agents])   # (N,m)
-                aa_consensus        = aa_k.T @ rr_i.T                      # (m,N)x(N,)=(m,)
-                ll_diff_consensus   = (ll_k - ll_k_minus_1).T @ rr_i.T     # (m,N)x(N,)=(m,)
-                ll_innovation       = agent_i["ll"] - agent_i["llm1"]      # (m,)
-                zz_innovation       = zz_k_plus_1[i] - agent_i["zz"]       # (d,)
+                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k} - \lambda^{k-1} + \gamma v^{k}) $$
 
-                aa_k_plus_1[i]  = agent_i["aa"] - gamma * aa_consensus\
-                                - ll_diff_consensus + ll_innovation\
-                                + beta * (B_i @ zz_innovation)
+                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k} - \lambda_j^{k-1} + \gamma v_j^{k}) $$
 
-                # HYBRID - centralized update:
-                # zz_k_flat = np.array([ag["zz"] for ag in self.problem.agents]).reshape((N*d,))
-                # aa_k_plus_1[i] = agent_i["ll"] + beta * (BB @ zz_k_flat - bb) # ReLU
+                
+                # $$ \text{Cannot use } \lambda_j^{k+1} \text{ and } v_j^{k+1} \text{ in a synchronous update,}$$
+                # $$ \text {the values are not available at this iteration!} $$
 
+                nn_k_plus_1[i] = agent_i["nn"] - (ll_k - ll_k_minus_1 + gamma * aa_k).T @ rr_i.T
+
+                
+                
                 # [ ll update ]
                 
                 # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[v_i^{k+1}] $$
                 
                 ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
-
+                
+                
                 total_cost += cost_i
                 
                 total_grad_ell[i] = grad_ell
@@ -203,6 +214,7 @@ class DuMeng(Algorithm):
             collector_ss.log(k, np.array([ag["ss"] for ag in self.problem.agents]))
             collector_vv.log(k, np.array([ag["vv"] for ag in self.problem.agents]))
             collector_aa.log(k, np.array([ag["aa"] for ag in self.problem.agents]))
+            collector_nn.log(k, np.array([ag["nn"] for ag in self.problem.agents]))
             collector_ll.log(k, np.array([ag["ll"] for ag in self.problem.agents]))
             
             # -- kkt
@@ -219,8 +231,9 @@ class DuMeng(Algorithm):
                 agent_i["ss"] = ss_k_plus_1[i]
                 agent_i["vv"] = vv_k_plus_1[i]
                 agent_i["aa"] = aa_k_plus_1[i]
-                agent_i["llm1"] = agent_i["ll"] #     old  <--  current 
-                agent_i["ll"] = ll_k_plus_1[i]  # current  <--  new
+                agent_i["llm1"] = agent_i["ll"]
+                agent_i["ll"] = ll_k_plus_1[i]
+                agent_i["nn"] = nn_k_plus_1[i]
 
         return RunResult (
             algorithm_name=type(self).__name__,
@@ -232,9 +245,10 @@ class DuMeng(Algorithm):
                 "sigma_traj": collector_ss.get(),
                 "vv_traj": collector_vv.get(),
                 "aa_traj": collector_aa.get(), 
+                "nn_traj": collector_nn.get(),
                 "lambda_traj": collector_ll.get(),
                 "grad_L_x_traj": collector_grad_L_z.get(),                
                 "grad_L_l_traj": collector_grad_L_l.get(),
-                "kkt_traj": collector_kkt.get()
+                "kkt_traj": collector_kkt.get(),
             }
         )

@@ -261,22 +261,23 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
 
     #     return self
 
-    def plot_aux(self, semilogy=True):
+    def plot_aux(self, keys, semilogy=True):
         ax = self.axes[1, 2]
-        if "aa_traj" not in self.result.aux:
-            ax.set_title("Aux var. 'aa' trajectory (missing in aux)")
-            return self
-        aa = self.result.aux["aa_traj"]
-        K, N, m = aa.shape
-        for i in range(N):
-            if m == 1:
-                ax.plot(np.arange(K), aa[:, i, 0], label=f"Agent {i+1}")
-            else:
-                for j in range(m):
-                    ax.plot(np.arange(K), aa[:, i, j], label=f"Agent {i+1}, dim {j}")
+        for key in keys:
+            if key not in self.result.aux:
+                ax.set_title("{key} trajectory (missing in aux)")
+                return self
+            val = self.result.aux[key]
+            K, N, m = val.shape
+            for i in range(N):
+                if m == 1:
+                    ax.plot(np.arange(K), val[:, i, 0], label=f"{key} Agent {i+1}")
+                else:
+                    for j in range(m):
+                        ax.plot(np.arange(K), val[:, i, j], label=f"{key} Agent {i+1}, dim {j}")
         ax.set_title("Aux var. evolutions")
         ax.set_xlabel("Iteration")
-        ax.set_ylabel("Aux var 'aa'")
+        ax.set_ylabel(f"{keys}")
         ax.grid(True, which="both", ls="--", alpha=0.6)
         ax.legend()
         return self
@@ -476,11 +477,92 @@ def show_and_wait(fig=None):
     plt.show(block=True)
 
 
+# from matplotlib.patches import Patch
+# def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12):
+#     """
+#     Plot the trajectory of (z1, z2) for N=2, d=1, with multiple affine constraints.
+#     Shades in RED the UNFEASIBLE region (union of violations).
+
+#     Parameters
+#     ----------
+#     result : RunResult
+#         Expected zz_traj shape (K, 2, 1).
+#     constraints : list[tuple[(a1, a2), b]]
+#         Each item is ((a1, a2), b) representing a1*z1 + a2*z2 <= b.
+#     tol : float
+#         Numerical tolerance for violation mask.
+#     """
+#     zz = result.zz_traj  # (K, 2, 1)
+#     K, N, d = zz.shape
+#     assert N == 2 and d == 1, f"Expected N=2, d=1 but got {N}, {d}"
+
+#     z1 = zz[:, 0, 0]
+#     z2 = zz[:, 1, 0]
+
+#     fig, ax = plt.subplots(figsize=(6, 6))
+
+#     # Trajectory
+#     ax.plot(z1, z2, 'b.-', label="Trajectory")
+#     ax.plot(z1[0], z2[0], 'go', label="Start")
+#     ax.plot(z1[-1], z2[-1], 'ro', label="End")
+
+#     # Fixed axes limits
+#     ax.set_xlim(-0.1, 1.1)
+#     ax.set_ylim(-0.1, 1.1)
+
+#     # Box Constraint
+#     rect1 = matplotlib.patches.Rectangle((0.0, 0.0), 1, 1, linestyle="dashed", ec='black', fc='None', lw=2)
+#     ax.add_patch(rect1)
+
+#     # Build a grid to shade the UNFEASIBLE region (union of violations)
+#     xs = np.linspace(-0.1, 1.1, 400)
+#     ys = np.linspace(-0.1, 1.1, 400)
+#     X, Y = np.meshgrid(xs, ys)
+#     violated = np.zeros_like(X, dtype=bool)
+
+#     # Plot each constraint line and accumulate violation mask
+#     for (a1, a2), b in constraints:
+#         if abs(a2) > 1e-12:
+#             # explicit form for z2
+#             y_line = (b - a1 * xs) / a2
+#             ax.plot(xs, y_line, 'k--', label=f"{a1}·z1 + {a2}·z2 = {b}")
+#         else:
+#             # vertical line: a1*z1 = b
+#             if abs(a1) < 1e-12:
+#                 continue  # degenerate constraint, skip
+#             x_line = np.full_like(ys, b / a1)
+#             ax.plot(x_line, ys, 'k--', label=f"{a1}·z1 = {b}")
+
+#         # accumulate violations: a1*X + a2*Y > b
+#         violated |= (a1 * X + a2 * Y > b + tol)
+
+#     # Shade UNFEASIBLE region (union of all violations)
+#     # Use contourf with two levels (0: feasible, 1: unfeasible)
+#     Z = violated.astype(int)
+#     ax.contourf(X, Y, Z, levels=[0.5, 1.5], colors=["red"], alpha=0.18)
+
+#     # Legend: add a proxy for the red region
+#     red_patch = Patch(facecolor='red', alpha=0.18, label='Unfeasible region')
+#     handles, labels = ax.get_legend_handles_labels()
+#     handles.append(red_patch); labels.append('Unfeasible region')
+#     ax.legend(handles, labels, loc='best')
+
+#     ax.set_title("Trajectory in (z1, z2) plane with multiple affine constraints")
+#     ax.set_xlabel("z1")
+#     ax.set_ylabel("z2")
+#     ax.grid(True, ls="--", alpha=0.6)
+#     plt.axis("equal")
+#     plt.show()
+
+
 from matplotlib.patches import Patch
-def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12):
+
+def plot_trajectory_plane_with_affine_constraints(result, constraints, c, 
+                                                  show_contours=True, n_levels=15, tol=1e-12):
     """
     Plot the trajectory of (z1, z2) for N=2, d=1, with multiple affine constraints.
-    Shades in RED the UNFEASIBLE region (union of violations).
+    Shades in RED the UNFEASIBLE region (union of violations) and (optionally)
+    overlays level sets of the cost J(x,y)=0.5*x^2 + 0.5*y^2 + ((x+y)/2 - c)^2.
 
     Parameters
     ----------
@@ -490,6 +572,12 @@ def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12
         Each item is ((a1, a2), b) representing a1*z1 + a2*z2 <= b.
     tol : float
         Numerical tolerance for violation mask.
+    c : float
+        Target for the average (x+y)/2 in the cost.
+    show_contours : bool
+        If True, draws the level sets of J(x,y).
+    n_levels : int
+        Number of contour levels.
     """
     zz = result.zz_traj  # (K, 2, 1)
     K, N, d = zz.shape
@@ -506,43 +594,56 @@ def plot_trajectory_plane_with_affine_constraints(result, constraints, tol=1e-12
     ax.plot(z1[-1], z2[-1], 'ro', label="End")
 
     # Fixed axes limits
-    ax.set_xlim(-0.1, 1.1)
-    ax.set_ylim(-0.1, 1.1)
+    x_min, x_max = -0.1, 1.1
+    y_min, y_max = -0.1, 1.1
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
 
     # Box Constraint
     rect1 = matplotlib.patches.Rectangle((0.0, 0.0), 1, 1, linestyle="dashed", ec='black', fc='None', lw=2)
     ax.add_patch(rect1)
 
-    # Build a grid to shade the UNFEASIBLE region (union of violations)
-    xs = np.linspace(-0.1, 1.1, 400)
-    ys = np.linspace(-0.1, 1.1, 400)
+    # Grid (use same extents as axes)
+    xs = np.linspace(x_min, x_max, 400)
+    ys = np.linspace(y_min, y_max, 400)
     X, Y = np.meshgrid(xs, ys)
+
+    # ===== Level sets of the cost J(x,y) =====
+    if show_contours:
+        J = 0.5*X**2 + 0.5*Y**2 + ((X+Y)/2.0 - c)**2
+        # Choose levels that avoid extremely small/large values for readability
+        Jmin, Jmax = np.percentile(J, 2), np.percentile(J, 98)
+        levels = np.linspace(Jmin, Jmax, n_levels)
+        CS = ax.contour(X, Y, J, levels=levels, linewidths=0.8, linestyles='solid', alpha=0.7)
+        ax.clabel(CS, inline=True, fontsize=8, fmt="%.2f")
+        # Add a legend handle
+        contours_proxy = Patch(facecolor='none', edgecolor='gray', label='Cost level sets')
+    else:
+        contours_proxy = None
+
+    # ===== Affine constraints & unfeasible region =====
     violated = np.zeros_like(X, dtype=bool)
 
-    # Plot each constraint line and accumulate violation mask
     for (a1, a2), b in constraints:
         if abs(a2) > 1e-12:
-            # explicit form for z2
             y_line = (b - a1 * xs) / a2
             ax.plot(xs, y_line, 'k--', label=f"{a1}·z1 + {a2}·z2 = {b}")
         else:
-            # vertical line: a1*z1 = b
             if abs(a1) < 1e-12:
-                continue  # degenerate constraint, skip
+                continue
             x_line = np.full_like(ys, b / a1)
             ax.plot(x_line, ys, 'k--', label=f"{a1}·z1 = {b}")
 
-        # accumulate violations: a1*X + a2*Y > b
         violated |= (a1 * X + a2 * Y > b + tol)
 
-    # Shade UNFEASIBLE region (union of all violations)
-    # Use contourf with two levels (0: feasible, 1: unfeasible)
     Z = violated.astype(int)
     ax.contourf(X, Y, Z, levels=[0.5, 1.5], colors=["red"], alpha=0.18)
 
-    # Legend: add a proxy for the red region
+    # Legend
     red_patch = Patch(facecolor='red', alpha=0.18, label='Unfeasible region')
     handles, labels = ax.get_legend_handles_labels()
+    if contours_proxy is not None:
+        handles.append(contours_proxy); labels.append('Cost level sets')
     handles.append(red_patch); labels.append('Unfeasible region')
     ax.legend(handles, labels, loc='best')
 

@@ -6,7 +6,7 @@ from typing import Optional
 
 from models.algorithm_interface import RunResult
 from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent, ArrowHurwiczUzawaPrimalDualGradientDescent
-from algorithms.affine_constraints.distributed import DuMeng
+from algorithms.affine_constraints.distributed import DuMeng, DuMeng2
 from models.phi import IdentityFunction
 from models.optimization_problem import AffineCouplingProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -110,8 +110,9 @@ def main():
     time_rtt = np.ones(N)*4
 
     # [ define initial condition ]
-    init_state = rng.uniform(0, 1, size=(N, d))
+    # init_state = rng.uniform(0, 1, size=(N, d))
     # init_state = np.zeros(shape=(N,d))
+    init_state = np.array([[0.1],[0.2]])
     # print(f"init_state: {init_state}")
 
     # [ define constraints ]
@@ -142,9 +143,9 @@ def main():
     # )
 
     B_list = np.ones((N,m,d))
-    # B_list[0] = np.array([[[0.5]]])
-    # B_list[1] = np.array([[[0.25]]])
-    b_list = np.ones((N,m)) * 0.25
+    B_list[0] = np.array([1])
+    B_list[1] = np.array([2])
+    b_list = np.ones((N,m)) * 0.5
 
     def setup_problem():
         agents = []
@@ -257,15 +258,15 @@ def main():
     # -----------------------
     if True:
         problem = setup_problem()
-        distributed = DuMeng(problem)
+        distributed = DuMeng2(problem)
         args = {
-            "max_iter": 2500, 
-            "stepsize": 0.006,
+            "max_iter": 5000,
+            "stepsize": 0.01,
             "seed": seed,
-            "beta": 0.005,
+            "beta": 0.01,
             "gamma": 0.01
         }
-        algo_params = DuMeng.AlgorithmParams(**args)
+        algo_params = DuMeng2.AlgorithmParams(**args)
         result = distributed.run(algo_params)
 
         i1, i2 = 0, 1  # indices of the agents you want to visualize
@@ -275,7 +276,7 @@ def main():
         ]
         result.summary()
 
-        plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
+        plots.plot_trajectory_plane_with_affine_constraints(result, constraints, 2*0.5)
 
 
         plotter = plots.ConstrainedRunResultPlotter(result)
@@ -285,7 +286,7 @@ def main():
             .plot_lambda(semilogy=False)\
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_aux()\
+            .plot_aux(["aa_traj", "nn_traj"])\
             .plot_lagr_stationarity()\
             .plot_kkt_conditions(semilogy=False)\
             .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\

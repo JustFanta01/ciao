@@ -31,7 +31,7 @@ class Agent:
     # "setitem" → agent["key"] = value
     def __setitem__(self, key, value):
         if key == "zz":
-            # TODO: add the prejection in [0,1] here?
+            # TODO: add the projection in [0,1] here?
             self.zz = value
         else:
             self.buffers[key] = value

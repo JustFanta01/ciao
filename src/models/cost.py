@@ -36,7 +36,8 @@ class QuadraticCostFunction(CostFunction):
         
         # $$ \frac{1}{2} z_i^T z_i + \frac{1}{2} (\sigma(z) - c) ^T (\sigma(z) - c) $$
         
-        return 0.5 * np.dot((zz_i - self.cost_params.cc), (zz_i - self.cost_params.cc)) + 0.5 * np.dot(sigma - self.cost_params.cc, sigma - self.cost_params.cc)
+        ss = sigma - self.cost_params.cc
+        return 0.5 * np.dot(zz_i, zz_i) + 0.5 * np.dot(ss, ss)
 
     def nabla_1(self, zz_i: np.ndarray, sigma: np.ndarray) -> np.ndarray:
         return zz_i
