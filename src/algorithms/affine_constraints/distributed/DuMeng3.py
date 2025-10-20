@@ -3,7 +3,7 @@ from models.algorithm_interface import RunResult, Algorithm, TrajectoryCollector
 from models.optimization_problem import ConstrainedOptimizationProblem
 from typing import cast
 
-class DuMeng2(Algorithm):
+class DuMeng3(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
         def __init__(self, max_iter: int, stepsize: float, seed: int, beta: float, gamma: float):
             super().__init__(max_iter, stepsize, seed)
@@ -69,8 +69,6 @@ class DuMeng2(Algorithm):
         # $$ z_i^0 \text{ arbitrarily (from init\_state)} $$
 
         for agent_i in self.problem.agents:
-            # agent_i["zzm1"] = np.zeros(d)
-            
             # [ init ss ]
             agent_i["ss"] = agent_i.phi(agent_i["zz"]) # $$ s_i^0 = \phi_i(z_i^0 ) $$
 
@@ -84,7 +82,6 @@ class DuMeng2(Algorithm):
             agent_i["nn"] = np.zeros(m)
 
             # [ init ll ]
-            agent_i["llm1"] = np.zeros(m) # $$ \lambda_i^{-1} = \mathbf{0}$$
             agent_i["ll"] = np.zeros(m) # $$ \lambda_i^0 = \mathbf{0}$$
 
         for k in range(K):
@@ -154,39 +151,39 @@ class DuMeng2(Algorithm):
 
                 # $$ a_i^{k+1} = \lambda_i^{k} + \beta (B_i z_i^k - b_i) + n_i^k  $$
 
-                aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ (2 * zz_k_plus_1[i] - agent_i["zz"]) - b_i) + agent_i["nn"]
+                # aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ (2 * zz_k_plus_1[i] - agent_i["zz"]) - b_i) + agent_i["nn"]
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ agent_i["zz"] - b_i) + agent_i["nn"]
+                aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ zz_k_plus_1[i] - b_i) + agent_i["nn"]
 
-                # [ nn update ]
-                
-                aa_k = np.array([ag["aa"] for ag in self.problem.agents])       # (N, m)
-                ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
-                ll_k_minus_1 = np.array([ag["llm1"] for ag in self.problem.agents])       # (N, m)
-                
-                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k} - \lambda^{k-1} + \gamma v^{k}) $$
-
-                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k} - \lambda_j^{k-1} + \gamma v_j^{k}) $$
-
-                
-                # $$ \text{Cannot use } \lambda_j^{k+1} \text{ and } v_j^{k+1}, j \in \mathcal{N}_i$$
-                # $$ \text {The values are not available at this iteration!} $$
-                # $$ \text {I can use my own updated variables but not from neighbours!} $$
-                
-
-                nn_k_plus_1[i] = agent_i["nn"] - (ll_k - ll_k_minus_1 + gamma * aa_k).T @ rr_i.T
-
-                
                 # [ ll update ]
                 
                 # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[v_i^{k+1}] $$
                 
                 ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
-                
-                
+
                 total_cost += cost_i
                 
                 total_grad_ell[i] = grad_ell
                 total_grad_L_in_z[i] = grad_L_in_z # (N,d)
+
+            ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
+            
+            # NOTE: THIRD round of communication! in the same iteration...
+            # - one for ss
+            # - one for vv
+            # - one for ll_k, ll_k_plus_1 and aa_k_plus_1
+            # $$ \text{ATTENTION: These values should not be available in this iteration!} $$
+            # $$ \text{we are mixing new and old states...} $$
+            # in the paper the comm. round is one and only at the end of the loop...
+
+            for i, agent_i in enumerate(self.problem.agents):
+                # [ nn update ]                
+                
+                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k+1} - \lambda^{k} + \gamma v^{k+1}) $$
+
+                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k+1} - \lambda_j^{k} + \gamma v_j^{k+1}) $$
+
+                nn_k_plus_1[i] = agent_i["nn"] - (ll_k_plus_1 - ll_k + gamma * aa_k_plus_1).T @ rr_i.T
 
             # global primal residual: r = A x - b
             zz_k_flat = np.array([ag["zz"] for ag in self.problem.agents]).reshape((N*d,))
@@ -230,12 +227,10 @@ class DuMeng2(Algorithm):
 
             # [ write back ]
             for i, agent_i in enumerate(self.problem.agents):
-                # agent_i["zzm1"] = agent_i["zz"]
                 agent_i["zz"] = zz_k_plus_1[i]
                 agent_i["ss"] = ss_k_plus_1[i]
                 agent_i["vv"] = vv_k_plus_1[i]
                 agent_i["aa"] = aa_k_plus_1[i]
-                agent_i["llm1"] = agent_i["ll"]
                 agent_i["ll"] = ll_k_plus_1[i]
                 agent_i["nn"] = nn_k_plus_1[i]
 
