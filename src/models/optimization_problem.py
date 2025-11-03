@@ -90,6 +90,19 @@ class ConstrainedOptimizationProblem(OptimizationProblem, ABC):
     def global_matrices():
         pass
 
+    def _block_diag(self, matrices):
+        """Build block diagonal matrix from list of 2D arrays."""
+        shapes = np.array([M.shape for M in matrices])
+        m, n = shapes[:,0].sum(), shapes[:,1].sum()
+        out = np.zeros((m, n))
+        i, j = 0, 0
+        for M in matrices:
+            mi, ni = M.shape
+            out[i:i+mi, j:j+ni] = M
+            i += mi
+            j += ni
+        return out
+
 
 class AffineCouplingProblem(ConstrainedOptimizationProblem):
     
@@ -139,19 +152,26 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         z_tot = np.concatenate([ag["zz"] for ag in self.agents])  # shape (N*d,)
         assert z_tot.shape == (self.N*self.d,)
         return self.B_global @ z_tot - self.b_global
-    
-    def _block_diag(self, matrices):
-        """Build block diagonal matrix from list of 2D arrays."""
-        shapes = np.array([M.shape for M in matrices])
-        m, n = shapes[:,0].sum(), shapes[:,1].sum()
-        out = np.zeros((m, n))
-        i, j = 0, 0
-        for M in matrices:
-            mi, ni = M.shape
-            out[i:i+mi, j:j+ni] = M
-            i += mi
-            j += ni
-        return out
 
     def global_matrices(self):
         return self.B_global, self.b_global
+
+
+class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
+    def __init__(self, agents:list[Agent], adj:np.ndarray, seed : int, c : np.ndarray):
+        super().__init__(agents, adj, seed)
+
+        # $$ \sigma(z) \le c $$
+        shape = self.sigma().shape
+        assert shape == c.shape, f"Wrong shape of c, expected {shape} but got {c.shape}"
+        self.c = c
+        self.m = shape[0]
+
+    def check(self):
+        return self.global_residual() <= 0
+
+    def global_residual(self):
+        return self.sigma() - self.c
+
+    def global_matrices(self):
+        return self.c

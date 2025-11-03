@@ -610,7 +610,8 @@ def plot_trajectory_plane_with_affine_constraints(result, constraints, c,
 
     # ===== Level sets of the cost J(x,y) =====
     if show_contours:
-        J = 0.5*X**2 + 0.5*Y**2 + ((X+Y)/2.0 - c)**2
+        # J = 0.5*X**2 + 0.5*Y**2 + ((np.square(X) + np.square(Y))/2.0 - c)**2
+        J = 0.5*X**2 + 0.5*Y**2 + ((X + Y)/2.0 - c)**2
         # Choose levels that avoid extremely small/large values for readability
         Jmin, Jmax = np.percentile(J, 2), np.percentile(J, 98)
         levels = np.linspace(Jmin, Jmax, n_levels)
@@ -655,3 +656,64 @@ def plot_trajectory_plane_with_affine_constraints(result, constraints, c,
     plt.show()
 
 
+def plot_trajectory_plane(result, cost_function_offset, constraint, component, show_contours=True, n_levels=15, tol=1e-12):
+    """
+    Plot the trajectory of (z1, z2) for N=2, d=1, with multiple affine constraints.
+    Shades in RED the UNFEASIBLE region (union of violations) and (optionally)
+    overlays level sets of the cost J(x,y)=0.5*x^2 + 0.5*y^2 + ((x+y)/2 - c)^2.
+    """
+    zz = result.zz_traj  # (K, 2, 1)
+    K, N, d = zz.shape
+    # assert N == 2 and i == 1, f"Expected N=2, d=1 but got {N}, {d}"
+
+    z1 = zz[:, 0, component]
+    z2 = zz[:, 1, component]
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    # Trajectory
+    ax.plot(z1, z2, 'b.-', label="Trajectory")
+    ax.plot(z1[0], z2[0], 'go', label="Start")
+    ax.plot(z1[-1], z2[-1], 'ro', label="End")
+
+    # Fixed axes limits
+    x_min, x_max = -0.1, 1.1
+    y_min, y_max = -0.1, 1.1
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+
+    # Box Constraint
+    rect1 = matplotlib.patches.Rectangle((0.0, 0.0), 1, 1, linestyle="dashed", ec='black', fc='None', lw=2)
+    ax.add_patch(rect1)
+
+    # Grid (use same extents as axes)
+    xs = np.linspace(x_min, x_max, 400)
+    ys = np.linspace(y_min, y_max, 400)
+    X, Y = np.meshgrid(xs, ys)
+
+    # ===== Level sets of the cost J(x,y) =====
+    if show_contours:
+        J = 0.5*X**2 + 0.5*Y**2 + ((np.square(X) + np.square(Y))/2.0 - cost_function_offset)**2
+        # Choose levels that avoid extremely small/large values for readability
+        Jmin, Jmax = np.percentile(J, 2), np.percentile(J, 98)
+        levels = np.linspace(Jmin, Jmax, n_levels)
+        CS = ax.contour(X, Y, J, levels=levels, linewidths=0.8, linestyles='solid', alpha=0.7)
+        ax.clabel(CS, inline=True, fontsize=8, fmt="%.2f")
+        # Add a legend handle
+        contours_proxy = Patch(facecolor='none', edgecolor='gray', label='Cost level sets')
+    else:
+        contours_proxy = None
+
+
+    # ===== Affine constraints & unfeasible region =====
+    violated = np.zeros_like(X, dtype=bool)
+    violated |= (0.5*(X**2 + Y**2) >= constraint)
+    Z = violated.astype(int)
+    ax.contourf(X, Y, Z, levels=[0.5, 1.5], colors=["red"], alpha=0.18)
+    
+    ax.set_title("Trajectory in (z1, z2) plane with sigma constraints")
+    ax.set_xlabel("z1")
+    ax.set_ylabel("z2")
+    ax.grid(True, ls="--", alpha=0.6)
+    plt.axis("equal")
+    plt.show()

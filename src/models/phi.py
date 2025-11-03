@@ -28,3 +28,33 @@ class IdentityFunction(AggregationContributionFunction):
     
     def nabla(self, zz):
         return np.eye(self.d)
+    
+class LinearFunction(AggregationContributionFunction):
+    """ $$ \text{Simplifying hypothesis: } n_i = d,  \forall i \in [N] $$ """
+    """ so: $$ \phi_i*: \mathbb{R}^{d} \rightarrow \ \mathbb{R}^{d} $$"""
+
+    def __init__(self, d, Q):
+        super().__init__(d,d)
+        self.Q = Q
+
+    # $$ \phi_i(z_i) = Qz_i $$
+    def eval(self, zz):
+        return self.Q @ zz
+    
+    def nabla(self, zz):
+        return self.Q
+    
+class SquareComponentWiseFunction(AggregationContributionFunction):
+    """ $$ \text{Simplifying hypothesis: } n_i = d,  \forall i \in [N] $$ """
+    """ so: $$ \phi_i*: \mathbb{R}^{d} \rightarrow \ \mathbb{R}^{d} $$"""
+
+    def __init__(self, d):
+        super().__init__(d,d)
+
+    def eval(self, zz):
+        return np.square(zz)
+    
+    def nabla(self, zz):
+        jac = np.zeros((self.d,self.d))
+        np.fill_diagonal(jac, 2 * zz)
+        return jac
