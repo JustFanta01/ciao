@@ -79,7 +79,7 @@ class DuMeng3(Algorithm):
             agent_i["aa"] = np.zeros(m) # $$ a_i^0 = \mathbf{0} $$
 
             # [ init nn ]
-            agent_i["nn"] = np.zeros(m)
+            agent_i["nn"] = np.zeros(m) # $$ n_i^0 = \mathbf{0} $$
 
             # [ init ll ]
             agent_i["ll"] = np.zeros(m) # $$ \lambda_i^0 = \mathbf{0}$$
@@ -90,7 +90,7 @@ class DuMeng3(Algorithm):
             total_grad_L_in_z = np.zeros((N,d))
             total_grad_L_in_l = np.zeros(m)
 
-            # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1}, a_i^{k+1}, \lambda_i^{k+1} $$
+            # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1}, a_i^{k+1}, n_i^{k+1}, \lambda_i^{k+1} $$
             zz_k_plus_1 = np.zeros((N,d))
             ss_k_plus_1 = np.zeros((N,d))
             vv_k_plus_1 = np.zeros((N,d))
@@ -98,6 +98,7 @@ class DuMeng3(Algorithm):
             nn_k_plus_1 = np.zeros((N,m))
             ll_k_plus_1 = np.zeros((N,m))
             
+            ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
 
             # point of view of agent-i
             for i, agent_i in enumerate(self.problem.agents):
@@ -151,13 +152,13 @@ class DuMeng3(Algorithm):
 
                 # $$ a_i^{k+1} = \lambda_i^{k} + \beta (B_i z_i^k - b_i) + n_i^k  $$
 
-                # aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ (2 * zz_k_plus_1[i] - agent_i["zz"]) - b_i) + agent_i["nn"]
+                aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ (2 * zz_k_plus_1[i] - agent_i["zz"])) + agent_i["nn"]
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ agent_i["zz"] - b_i) + agent_i["nn"]
-                aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ zz_k_plus_1[i] - b_i) + agent_i["nn"]
+                # aa_k_plus_1[i] = agent_i["ll"] + beta * (B_i @ zz_k_plus_1[i] - b_i) + agent_i["nn"]
 
                 # [ ll update ]
                 
-                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[v_i^{k+1}] $$
+                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[a_i^{k+1}] $$
                 
                 ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
 
@@ -166,7 +167,6 @@ class DuMeng3(Algorithm):
                 total_grad_ell[i] = grad_ell
                 total_grad_L_in_z[i] = grad_L_in_z # (N,d)
 
-            ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
             
             # NOTE: THIRD round of communication! in the same iteration...
             # - one for ss
@@ -179,9 +179,9 @@ class DuMeng3(Algorithm):
             for i, agent_i in enumerate(self.problem.agents):
                 # [ nn update ]                
                 
-                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k+1} - \lambda^{k} + \gamma v^{k+1}) $$
+                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k+1} - \lambda^{k} + \gamma a^{k+1}) $$
 
-                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k+1} - \lambda_j^{k} + \gamma v_j^{k+1}) $$
+                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k+1} - \lambda_j^{k} + \gamma a_j^{k+1}) $$
 
                 nn_k_plus_1[i] = agent_i["nn"] - (ll_k_plus_1 - ll_k + gamma * aa_k_plus_1).T @ rr_i.T
 

@@ -81,7 +81,7 @@ class DuMeng2(Algorithm):
             agent_i["aa"] = np.zeros(m) # $$ a_i^0 = \mathbf{0} $$
 
             # [ init nn ]
-            agent_i["nn"] = np.zeros(m)
+            agent_i["nn"] = np.zeros(m) # $$ n_i^0 = \mathbf{0}$$
 
             # [ init ll ]
             agent_i["llm1"] = np.zeros(m) # $$ \lambda_i^{-1} = \mathbf{0}$$
@@ -93,7 +93,7 @@ class DuMeng2(Algorithm):
             total_grad_L_in_z = np.zeros((N,d))
             total_grad_L_in_l = np.zeros(m)
 
-            # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1}, a_i^{k+1}, \lambda_i^{k+1} $$
+            # [ new states ] $$ z_i^{k+1}, s_i^{k+1}, v_i^{k+1}, a_i^{k+1}, n_i^{k+1}, \lambda_i^{k+1} $$
             zz_k_plus_1 = np.zeros((N,d))
             ss_k_plus_1 = np.zeros((N,d))
             vv_k_plus_1 = np.zeros((N,d))
@@ -163,9 +163,9 @@ class DuMeng2(Algorithm):
                 ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
                 ll_k_minus_1 = np.array([ag["llm1"] for ag in self.problem.agents])       # (N, m)
                 
-                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k} - \lambda^{k-1} + \gamma v^{k}) $$
+                # $$ n_i^{k+1} = n_i^{k} - \mathcal{L}^2 (\lambda^{k} - \lambda^{k-1} + \gamma a^{k}) $$
 
-                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k} - \lambda_j^{k-1} + \gamma v_j^{k}) $$
+                # $$ n_i^{k+1} = n_i^{k} - \sum_{j=1}^{N}r_{ij} (\lambda_j^{k} - \lambda_j^{k-1} + \gamma a_j^{k}) $$
 
                 
                 # $$ \text{Cannot use } \lambda_j^{k+1} \text{ and } v_j^{k+1}, j \in \mathcal{N}_i$$
@@ -178,7 +178,7 @@ class DuMeng2(Algorithm):
                 
                 # [ ll update ]
                 
-                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[v_i^{k+1}] $$
+                # $$ \lambda_i^{k+1} = \mathit{\Pi}_{\mathbb{R}_+^m}[a_i^{k+1}] $$
                 
                 ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
                 
