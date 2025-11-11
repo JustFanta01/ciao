@@ -10,14 +10,14 @@ from models.phi import IdentityFunction
 from models.optimization_problem import OptimizationProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
-from viz import plots, animation
+from plots import plots, animation
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
 
 
 def main():
-    N = 5  # number of agents
+    N = 2  # number of agents
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
@@ -51,7 +51,7 @@ def main():
                 alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
             )
             cost_fn = LocalCloudTradeoffCostFunction(cost_params)
-            # cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
+            # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
             # cost_fn = QuadraticCostFunction(cost_params)
             phi_fn = IdentityFunction(d)
             # init_state = rng.uniform(0, 1, size=d)
@@ -78,17 +78,30 @@ def main():
     problem = setup_problem()
     centralized = CentralizedGradientMethod(problem)
     args = {
-        "max_iter": 1000,
+        "max_iter": 2000,
         "stepsize": 0.01,
         "seed":seed
     }
     algo_params = CentralizedGradientMethod.AlgorithmParams(**args)
     result = centralized.run(algo_params)
     
-    plotter = plots.BaseRunResultPlotter(result)
-    plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
-    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+    result.summary()
 
+    plotter = plots.BaseRunResultPlotter(problem, result)
+    plotter\
+        .clear()\
+        .plot_cost(semilogy=False)\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .show()
+
+    if N == 2 and d == 1:
+        plotter\
+            .clear()\
+            .plot_phase2d()\
+            .show()
+    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # -----------------------
     # |     DISTRIBUTED     |
@@ -96,15 +109,30 @@ def main():
     problem = setup_problem()
     distributed = AggregativeTracking(problem)
     args = {
-        "max_iter": 1000,
+        "max_iter": 2000,
         "stepsize": 0.01, 
         "seed":seed
     }
     algo_params = AggregativeTracking.AlgorithmParams(**args)
     result = distributed.run(algo_params)
 
-    plotter = plots.BaseRunResultPlotter(result)
-    plotter.plot_cost().plot_grad_norm().plot_agents_trajectories().plot_sigma_trajectory().show()
+    result.summary()
+
+    plotter = plots.BaseRunResultPlotter(problem, result)
+    plotter\
+        .clear()\
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .show()
+
+    if N == 2 and d == 1:
+        plotter\
+            .clear()\
+            .plot_phase2d()\
+            .show()
+    
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!

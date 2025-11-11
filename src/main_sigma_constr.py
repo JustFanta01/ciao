@@ -11,7 +11,7 @@ from models.optimization_problem import ConstrainedSigmaProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
 from models.constraints import LinearConstraint
-from viz import plots, animation
+from plots import plots_old, plots, animation
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
@@ -95,7 +95,7 @@ def generate_B_b_simple(
 def main():
     N = 2  # number of agents
     d = 1  # dimension of the state space
-    constraint = np.ones(d) * 0.75
+    constraint = np.ones(d) * 0.25
     seed = 3
     # rng = np.random.default_rng(seed)
 
@@ -119,17 +119,17 @@ def main():
     def setup_problem():
         agents = []
         for i in range(N):
-            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
-            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            # )
-            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            cost_params = LocalCloudTradeoffCostFunction.CostParams(
+                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            )
+            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
-            cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
-            cost_fn = QuadraticCostFunction(cost_params)
+            # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
+            # cost_fn = QuadraticCostFunction(cost_params)
             
             phi_fn = SquareComponentWiseFunction(d)
             # phi_fn = IdentityFunction(d)
-            # phi_fn = LinearFunction(d, np.eye(d) * (i + 1))
+            # phi_fn = LinearFunction(d, np.eye(d) * (2*i + 1))
             agent_i = Agent(i, cost_fn, phi_fn, init_state[i])
             
             agents.append(agent_i)
@@ -155,34 +155,39 @@ def main():
         problem = setup_problem()
         distributed = SigmaConstraint(problem)
         args = {
-            "max_iter": 5000,
+            "max_iter": 2000,
             "stepsize": 0.01,
             "seed": seed,
-            "beta": 0.01,
-            "gamma": 0.01
+            "beta": 0.05,
+            "gamma": 0.05
         }
         algo_params = SigmaConstraint.AlgorithmParams(**args)
         result = distributed.run(algo_params)
 
-        
         result.summary()
 
-        plots.plot_trajectory_plane(result, cost_function_offset=2*0.5, constraint=constraint, component=0)
-        # plots.plot_trajectory_plane_with_affine_constraints(result, [((1,2), 2*constraint)], 2*0.5)
-
-
-        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter = plots.ConstrainedRunResultPlotter(problem, result)
         plotter\
+            .clear()\
+            \
             .plot_cost()\
             .plot_grad_norm()\
-            .plot_lambda(semilogy=False)\
+            .plot_lambda_trajectory(semilogy=False)\
+            \
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_aux(["aa_traj", "nn_traj"])\
+            .plot_aux(["aa_traj", "nn_traj"], semilogy=False)\
+            \
             .plot_lagr_stationarity()\
-            .plot_kkt_conditions(semilogy=False)\
             .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
+            .plot_kkt_conditions()\
             .show()
+        
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
         # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
 

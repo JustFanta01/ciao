@@ -21,12 +21,13 @@ class QuadraticCostFunction(CostFunction):
     """
     Simple quadratic cost function:
 
+    
         $$ \ell_i(z_i, \sigma(\textbf{z})) = \frac{1}{2} ||z_i||^2 + \frac{1}{2} ||\sigma(\textbf{z}) - c||^2 $$
     """
 
     @dataclass
     class CostParams(CostFunction.CostParams):
-        cc : float
+        cc : np.ndarray
 
     def __init__(self, cost_params: CostParams):
         super().__init__()
@@ -37,7 +38,16 @@ class QuadraticCostFunction(CostFunction):
         # $$ \frac{1}{2} z_i^T z_i + \frac{1}{2} (\sigma(z) - c) ^T (\sigma(z) - c) $$
         
         ss = sigma - self.cost_params.cc
-        return 0.5 * np.dot(zz_i, zz_i) + 0.5 * np.dot(ss, ss)
+        
+        def square_norm(x):
+            if x.ndim == 2: # (H, W) -> passing a meshgrid, scalar field (d=1), cannot 2d plot when d>1.
+                return x*x
+            elif x.ndim == 1: # (d,) -> vector state
+                return x.T @ x
+            else:
+                ValueError("Unmatched shape of x.shape={x.shape}")
+            
+        return 0.5 * square_norm(zz_i) + 0.5 * square_norm(ss)
 
     def nabla_1(self, zz_i: np.ndarray, sigma: np.ndarray) -> np.ndarray:
         return zz_i
@@ -60,9 +70,12 @@ class LocalCloudTradeoffCostFunction(CostFunction):
         self.cost_params = cost_params
 
     def cost_fn(self, zz_i, sigma):
-        assert np.ndim(zz_i) == 0 or (np.ndim(zz_i) == 1 and zz_i.size == 1), \
-            f"LocalCloudTradeoffCostFunction expects scalar z_i, got shape {np.shape(zz_i)}"
-
+        # assert np.ndim(zz_i) == 0 or (np.ndim(zz_i) == 1 and zz_i.size == 1), \
+            # f"LocalCloudTradeoffCostFunction expects scalar z_i, got shape {np.shape(zz_i)}"
+        
+        assert (zz_i.ndim == 1 and sigma.ndim == 1) or (zz_i.ndim == 2 and sigma.ndim == 2), \
+            f"Bad shape, zz_i/sigma must be scalar (d,) d=1 or from a meshgrid (H,W). Got zz_i:{zz_i.shape} and sigma:{sigma.shape}"
+        
         """ [ cost function ]:  $$ \ell_i(z_i, \sigma(z)) := (1-z_i) \cdot \ell_i^{loc}(z_i) + z_i \cdot \ell_i^{cloud}(\sigma(\textbf{z})) $$
         """
 

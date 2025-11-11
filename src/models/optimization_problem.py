@@ -1,6 +1,7 @@
 import numpy as np
 from .agent import Agent
 from abc import ABC, abstractmethod
+from multipledispatch import dispatch
 
 class OptimizationProblem():
     def __init__(self, agents:list[Agent], adj:np.ndarray, seed : int):
@@ -79,7 +80,7 @@ class ConstrainedOptimizationProblem(OptimizationProblem, ABC):
         super().__init__(agents, adj, seed)
 
     @abstractmethod
-    def check():
+    def check() -> bool:
         pass
 
     @abstractmethod
@@ -88,6 +89,10 @@ class ConstrainedOptimizationProblem(OptimizationProblem, ABC):
 
     @abstractmethod
     def global_matrices():
+        pass
+    
+    @abstractmethod
+    def draw_constraints():
         pass
 
     def _block_diag(self, matrices):
@@ -142,20 +147,47 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
 
         self.m = self.B_global.shape[0]
 
+    @dispatch()
     def check(self):
-        return self.global_residual() <= 0
-
-    def global_residual(self):
-        
-        # it returns $$ \sum_{i=0}^{N}B_i z_i - \sum_{i=0}^{N}b_i $$
-
         z_tot = np.concatenate([ag["zz"] for ag in self.agents])  # shape (N*d,)
         assert z_tot.shape == (self.N*self.d,)
-        return self.B_global @ z_tot - self.b_global
+        return self.global_residual(z_tot) <= 0
+
+    @dispatch(np.ndarray, np.ndarray)
+    def check(self, zz, ss):
+        res = self.global_residual(zz)
+        feasible = np.all(res <= 0, axis=-1) # (H, W) boolean mask
+        return feasible
+
+    def global_residual(self, zz: np.ndarray) -> np.ndarray:
+        # zz: (H, W, N*d), N=2, d=1
+        # zz: (N*d,)
+        # B: (m, N*d)
+        # b: (m,)
+        B, b = self.B_global, self.b_global
+        assert zz.shape[-1] == B.shape[1], f"expected last dim {B.shape[1]}, got {zz.shape[-1]}"
+        res = np.tensordot(zz, B.T, axes=([-1],[0])) - b  # (..., m)
+        return res
 
     def global_matrices(self):
         return self.B_global, self.b_global
+    
+    def draw_constraints(self, ax):
+        assert self.B_global.shape[1] == 2, "N=2, d=1 for drawing lines"
+        xs = np.linspace(-0.1, 1.1, 400)
+        ys = np.linspace(-0.1, 1.1, 400)
 
+        for m in range(self.m):
+            a1, a2, b = self.B_global[m,0], self.B_global[m,1], self.b_global[m]
+            
+            if abs(a2) > 1e-12:
+                y_line = (b - a1 * xs) / a2
+                ax.plot(xs, y_line, 'k--', label=f"{a1}·z1 + {a2}·z2 = {b}")
+            else:
+                if abs(a1) < 1e-12:
+                    continue
+                x_line = np.full_like(ys, b / a1)
+                ax.plot(x_line, ys, 'k--', label=f"{a1}·z1 = {b}")
 
 class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
     def __init__(self, agents:list[Agent], adj:np.ndarray, seed : int, c : np.ndarray):
@@ -167,11 +199,22 @@ class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
         self.c = c
         self.m = shape[0]
 
+    @dispatch()
     def check(self):
-        return self.global_residual() <= 0
+        return self.global_residual(self.sigma()) <= 0
 
-    def global_residual(self):
-        return self.sigma() - self.c
+    @dispatch(np.ndarray, np.ndarray)
+    def check(self, zz, ss):
+        return self.global_residual(ss) <= 0
+
+    def global_residual(self, ss):
+        return ss - self.c
 
     def global_matrices(self):
         return self.c
+    
+    def draw_constraints(self, ax):
+        assert self.N == 2 and self.d == 1, "N=2, d=1 for drawing 2d plot"
+        # xs = np.linspace(-0.1, 1.1, 400)
+        # ys = np.linspace(-0.1, 1.1, 400)
+        pass

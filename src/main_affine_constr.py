@@ -6,13 +6,13 @@ from typing import Optional
 
 from models.algorithm_interface import RunResult
 from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent, ArrowHurwiczUzawaPrimalDualGradientDescent
-from algorithms.affine_constraints.distributed import DuMeng, DuMeng2
+from algorithms.affine_constraints.distributed import DuMeng, DuMeng2, DuMeng3, DuMeng4
 from models.phi import IdentityFunction
 from models.optimization_problem import AffineCouplingProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
 from models.constraints import LinearConstraint
-from viz import plots, animation
+from plots import plots, animation
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
@@ -95,13 +95,12 @@ def generate_B_b_simple(
 
 def main():
     N = 2  # number of agents
-    m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
+    m = 3  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
-    rng = np.random.default_rng(seed)
     alpha = np.ones(N)
     beta = np.ones(N)
     energy_task = np.ones(N)*4
@@ -110,9 +109,9 @@ def main():
     time_rtt = np.ones(N)*4
 
     # [ define initial condition ]
-    # init_state = rng.uniform(0, 1, size=(N, d))
+    init_state = rng.uniform(0, 1, size=(N, d))
     # init_state = np.zeros(shape=(N,d))
-    init_state = np.array([[0.1],[0.2]])
+    # init_state = np.array([[0.1],[0.2]])
     # print(f"init_state: {init_state}")
 
     # [ define constraints ]
@@ -130,34 +129,33 @@ def main():
     BWcloud_GBps = 3
     Mem_cloud_GB = 3
 
-    # B_list, b_list, b_sum = generate_B_b_simple(
-    #     W_nom_GF=W_nom_GF[0:N],
-    #     M_job_GB=M_job_GB[0:N],
-    #     S_GB=S_GB[0:N],
-    #     gamma_GB_per_GF=gamma_GB_per_GF[0:N],
-    #     T=T,
-    #     Pcloud_GFps=Pcloud_GFps,
-    #     Mem_cloud_GB=Mem_cloud_GB,
-    #     BWcloud_GBps=BWcloud_GBps,
-    #     equal_split=True  # set False and pass w_* to customize splits
-    # )
+    B_list, b_list, b_sum = generate_B_b_simple(
+        W_nom_GF=W_nom_GF[0:N],
+        M_job_GB=M_job_GB[0:N],
+        S_GB=S_GB[0:N],
+        gamma_GB_per_GF=gamma_GB_per_GF[0:N],
+        T=T,
+        Pcloud_GFps=Pcloud_GFps,
+        Mem_cloud_GB=Mem_cloud_GB,
+        BWcloud_GBps=BWcloud_GBps,
+        equal_split=True  # set False and pass w_* to customize splits
+    )
 
-    B_list = np.ones((N,m,d))
-    B_list[0] = np.array([1])
-    B_list[1] = np.array([2])
-    b_list = np.ones((N,m)) * 0.5
+    # B_list = np.ones((N,m,d))
+    # B_list[0] = np.array([1])
+    # B_list[1] = np.array([2])
+    # b_list = np.ones((N,m)) * 0.5
 
     def setup_problem():
         agents = []
         for i in range(N):
-            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
-            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            # )
-            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            cost_params = LocalCloudTradeoffCostFunction.CostParams(
+                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            )
+            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
-            
-            cost_params = QuadraticCostFunction.CostParams(cc=2 * 0.5) # optimum: z_i = 0.5
-            cost_fn = QuadraticCostFunction(cost_params)
+            # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
+            # cost_fn = QuadraticCostFunction(cost_params)
             
             lc = LinearConstraint(B_list[i], b_list[i])
 
@@ -182,12 +180,12 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    if False:
+    if True:
         problem = setup_problem()
 
         centralized = AugmentedPrimalDualGradientDescent(problem)
         args = {
-            "max_iter": 2500, 
+            "max_iter": 2000, 
             "stepsize": 0.01,
             "seed": seed,
             "rho": 3,
@@ -195,26 +193,28 @@ def main():
         }
         algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
         result = centralized.run(algo_params)
-
-        i1, i2 = 0, 1  # indices of the agents you want to visualize
-        constraints = [
-            ((B_list[i1][k, 0], B_list[i2][k, 0]), b_list[i1][k] + b_list[i2][k])
-            for k in range(B_list[i1].shape[0])
-        ]
-        plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
-
         result.summary()
 
-        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter = plots.ConstrainedRunResultPlotter(problem, result)
         plotter\
+            .clear()\
+            \
             .plot_cost()\
             .plot_grad_norm()\
+            .plot_lambda_trajectory(semilogy=False)\
+            \
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
             .plot_lagr_stationarity()\
-            .plot_kkt_conditions(semilogy=False)\
-            .plot_lambda(semilogy=False)\
+            \
+            .plot_kkt_conditions()\
             .show()
+        
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
         # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # -----------------------
@@ -224,13 +224,14 @@ def main():
         problem = setup_problem()
         centralized = ArrowHurwiczUzawaPrimalDualGradientDescent(problem)
         args = {
-            "max_iter": 2500, 
+            "max_iter": 2000, 
             "stepsize": 0.001,
             "seed": seed,
             "dual_stepsize": 0.001
         }
         algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
         result = centralized.run(algo_params)
+        result.summary()
 
         i1, i2 = 0, 1  # indices of the agents you want to visualize
         constraints = [
@@ -239,7 +240,6 @@ def main():
         ]
         plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
 
-        result.summary()
 
         plotter = plots.ConstrainedRunResultPlotter(result)
         plotter\
@@ -260,7 +260,7 @@ def main():
         problem = setup_problem()
         distributed = DuMeng2(problem)
         args = {
-            "max_iter": 5000,
+            "max_iter": 2000,
             "stepsize": 0.01,
             "seed": seed,
             "beta": 0.01,
@@ -269,28 +269,28 @@ def main():
         algo_params = DuMeng2.AlgorithmParams(**args)
         result = distributed.run(algo_params)
 
-        i1, i2 = 0, 1  # indices of the agents you want to visualize
-        constraints = [
-            ((B_list[i1][k, 0], B_list[i2][k, 0]), b_list[i1][k] + b_list[i2][k])
-            for k in range(B_list[i1].shape[0])
-        ]
-        result.summary()
-
-        plots.plot_trajectory_plane_with_affine_constraints(result, constraints, 2*0.5)
-
-
-        plotter = plots.ConstrainedRunResultPlotter(result)
+        plotter = plots.ConstrainedRunResultPlotter(problem, result)
         plotter\
+            .clear()\
+            \
             .plot_cost()\
             .plot_grad_norm()\
-            .plot_lambda(semilogy=False)\
+            .plot_lambda_trajectory(semilogy=False)\
+            \
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_aux(["aa_traj", "nn_traj"])\
+            .plot_aux(["aa_traj"], semilogy=False)\
+            \
             .plot_lagr_stationarity()\
-            .plot_kkt_conditions(semilogy=False)\
             .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
+            .plot_kkt_conditions()\
             .show()
+        
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
         # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
 

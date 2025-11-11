@@ -35,11 +35,18 @@ class LinearFunction(AggregationContributionFunction):
 
     def __init__(self, d, Q):
         super().__init__(d,d)
+        assert Q.shape == (d,d), f"phi: wrong shape of Q: {Q.shape}, expecting {(d,d)}"
         self.Q = Q
 
     # $$ \phi_i(z_i) = Qz_i $$
     def eval(self, zz):
-        return self.Q @ zz
+        if zz.ndim == 1:  # (d,)
+            return self.Q @ zz
+        
+        if zz.ndim > 1 and zz.shape[-1] != self.d: # (H, W)
+            zz = np.expand_dims(zz, axis=-1)  # (H, W, 1)
+        res = np.tensordot(zz, self.Q.T, axes=([-1], [0])).squeeze(-1)
+        return res
     
     def nabla(self, zz):
         return self.Q

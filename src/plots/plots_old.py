@@ -705,7 +705,7 @@ def plot_trajectory_plane(result, cost_function_offset, constraint, component, s
         contours_proxy = None
 
 
-    # ===== Affine constraints & unfeasible region =====
+    # ===== Sigma constraints & unfeasible region =====
     violated = np.zeros_like(X, dtype=bool)
     violated |= (0.5*(X**2 + Y**2) >= constraint)
     Z = violated.astype(int)
