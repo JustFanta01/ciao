@@ -95,7 +95,7 @@ def generate_B_b_simple(
 
 def main():
     N = 2  # number of agents
-    m = 3  # number of affine constraints per agent, B_i is a matrix (m,d)
+    m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
     seed = 3
     rng = np.random.default_rng(seed)
@@ -129,33 +129,35 @@ def main():
     BWcloud_GBps = 3
     Mem_cloud_GB = 3
 
-    B_list, b_list, b_sum = generate_B_b_simple(
-        W_nom_GF=W_nom_GF[0:N],
-        M_job_GB=M_job_GB[0:N],
-        S_GB=S_GB[0:N],
-        gamma_GB_per_GF=gamma_GB_per_GF[0:N],
-        T=T,
-        Pcloud_GFps=Pcloud_GFps,
-        Mem_cloud_GB=Mem_cloud_GB,
-        BWcloud_GBps=BWcloud_GBps,
-        equal_split=True  # set False and pass w_* to customize splits
-    )
+    # [ cloud constraints ]
+    # B_list, b_list, b_sum = generate_B_b_simple(
+    #     W_nom_GF=W_nom_GF[0:N],
+    #     M_job_GB=M_job_GB[0:N],
+    #     S_GB=S_GB[0:N],
+    #     gamma_GB_per_GF=gamma_GB_per_GF[0:N],
+    #     T=T,
+    #     Pcloud_GFps=Pcloud_GFps,
+    #     Mem_cloud_GB=Mem_cloud_GB,
+    #     BWcloud_GBps=BWcloud_GBps,
+    #     equal_split=True  # set False and pass w_* to customize splits
+    # )
 
-    # B_list = np.ones((N,m,d))
-    # B_list[0] = np.array([1])
-    # B_list[1] = np.array([2])
-    # b_list = np.ones((N,m)) * 0.5
+    # [ simple test constraints ]
+    B_list = np.ones((N,m,d))
+    B_list[0] = np.array([1])
+    B_list[1] = np.array([2])
+    b_list = np.ones((N,m)) * 0.5
 
     def setup_problem():
         agents = []
         for i in range(N):
-            cost_params = LocalCloudTradeoffCostFunction.CostParams(
-                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            )
-            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
+            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            # )
+            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
-            # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
-            # cost_fn = QuadraticCostFunction(cost_params)
+            cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
+            cost_fn = QuadraticCostFunction(cost_params)
             
             lc = LinearConstraint(B_list[i], b_list[i])
 
@@ -258,7 +260,7 @@ def main():
     # -----------------------
     if True:
         problem = setup_problem()
-        distributed = DuMeng2(problem)
+        distributed = DuMeng(problem)
         args = {
             "max_iter": 2000,
             "stepsize": 0.01,
@@ -266,7 +268,7 @@ def main():
             "beta": 0.01,
             "gamma": 0.01
         }
-        algo_params = DuMeng2.AlgorithmParams(**args)
+        algo_params = DuMeng.AlgorithmParams(**args)
         result = distributed.run(algo_params)
 
         plotter = plots.ConstrainedRunResultPlotter(problem, result)

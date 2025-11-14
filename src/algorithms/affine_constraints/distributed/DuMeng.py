@@ -113,8 +113,8 @@ class DuMeng(Algorithm):
 
                 # [ zz update ]
                 
-                # $$ w_i^{k+1} = w_i^k - \alpha(\nabla_1f_i(w_i^k, z_i^k) + \nabla h_i(w_i^k) \mu_i^k + B_i^T \lambda_i^k ) $$
-                
+                # $$ z_i^{k+1} = z_i^k - \alpha(\nabla_1 \ell_i(z_i^k, s_i^k) + \nabla \phi_i(z_i^k) v_i^k + B_i^T \lambda_i^k ) $$
+
                 nabla_1 = agent_i.nabla_1(agent_i["zz"], agent_i["ss"])
                 nabla_phi = agent_i.nabla_phi(agent_i["zz"])
                 grad_ell = nabla_1 + nabla_phi @ agent_i["vv"]
@@ -145,7 +145,7 @@ class DuMeng(Algorithm):
 
                 # [ aa update ]
                 
-                # $$ v_i^{k+1} = v_i^{k} - \gamma \sum_{j=0}^{N}r_{ij} v_{j}^k - \sum_{j=0}^{N}r_{ij}(\lambda_j^k - \lambda_j^{k-1}) + (\lambda_i^k - \lambda_i^{k-1}) + \beta B_i(w_i^{k+1} - w_i^{k}) $$
+                # $$ a_i^{k+1} = a_i^{k} - \gamma \sum_{j=0}^{N}r_{ij} a_{j}^k - \sum_{j=0}^{N}r_{ij}(\lambda_j^k - \lambda_j^{k-1}) + (\lambda_i^k - \lambda_i^{k-1}) + \beta B_i(z_i^{k+1} - z_i^{k}) $$
                 
                 aa_k         = np.array([agent_j["aa"]      for agent_j in self.problem.agents])   # (N,m)
                 ll_k_minus_1 = np.array([agent_j["llm1"]    for agent_j in self.problem.agents])   # (N,m)
@@ -161,7 +161,7 @@ class DuMeng(Algorithm):
 
                 # HYBRID - centralized update:
                 # zz_k_flat = np.array([ag["zz"] for ag in self.problem.agents]).reshape((N*d,))
-                # aa_k_plus_1[i] = agent_i["ll"] + beta * (BB @ zz_k_flat - bb) # ReLU
+                # aa_k_plus_1[i] = agent_i["ll"] + beta * (BB @ zz_k_flat - bb)
 
                 # [ ll update ]
                 
@@ -182,7 +182,7 @@ class DuMeng(Algorithm):
             # stationarity: ||∇f(x) + A^T λ||
             ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
             ll_k_flat = ll_k.reshape((N*m,))
-            ll_bar = np.mean(ll_k, axis=0) # TODO: la media?
+            ll_bar = np.mean(ll_k, axis=0) # TODO: the mean?
             # BB.T @ ll_bar
             # eq (10a): $$ \mathbf{0} = \nabla_1 f(w^*, z^*) + \nabla h(w^*)\mu^* + \Lambda^T\lambda^* $$
             stationarity = np.linalg.norm(total_grad_ell.reshape(-1) + self.problem.B_local.T @ ll_k_flat)
