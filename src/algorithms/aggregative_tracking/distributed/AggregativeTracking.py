@@ -79,10 +79,6 @@ class AggregativeTracking(Algorithm):
                 total_cost += cost_i
                 total_grad += grad_i
 
-            for i, agent_i in enumerate(self.problem.agents):
-                agent_i["zz"] = zz_k_plus_1[i]
-                agent_i["ss"] = ss_k_plus_1[i]
-                agent_i["vv"] = vv_k_plus_1[i]
 
             # [ collector ]
             collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
@@ -91,6 +87,12 @@ class AggregativeTracking(Algorithm):
 
             collector_cost.log(k, total_cost)
             collector_grad.log(k, total_grad)
+            
+            # [ writeback ]
+            for i, agent_i in enumerate(self.problem.agents):
+                agent_i["zz"] = zz_k_plus_1[i]
+                agent_i["ss"] = ss_k_plus_1[i]
+                agent_i["vv"] = vv_k_plus_1[i]
 
         return RunResult (
             algorithm_name = type(self).__name__,
