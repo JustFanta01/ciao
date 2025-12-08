@@ -3,7 +3,7 @@ from models.algorithm_interface import RunResult, Algorithm, TrajectoryCollector
 from models.optimization_problem import ConstrainedOptimizationProblem
 from typing import cast
 
-class SigmaConstraint(Algorithm):
+class CIAO(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
         def __init__(self, max_iter: int, stepsize: float, seed: int, beta: float, gamma: float):
             super().__init__(max_iter, stepsize, seed)
@@ -159,8 +159,8 @@ class SigmaConstraint(Algorithm):
                 # ------------------------------- NEW -------------------------
                 # sigma_global = self.problem.sigma()
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * (sigma_global - c) + agent_i["nn"]
-                aa_k_plus_1[i] = agent_i["ll"] + beta * (agent_i["ss"] - c) + agent_i["nn"]
-                # aa_k_plus_1[i] = agent_i["ll"] + beta * (ss_k_plus_1[i] - c) + agent_i["nn"]
+                # aa_k_plus_1[i] = agent_i["ll"] + beta * (agent_i["ss"] - c) + agent_i["nn"]
+                aa_k_plus_1[i] = agent_i["ll"] + beta * (ss_k_plus_1[i] - c) + agent_i["nn"]
                 
                 # "extragradients"
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * ((2 * agent_i["ss"] - agent_i["ssm1"]) - c) + agent_i["nn"]

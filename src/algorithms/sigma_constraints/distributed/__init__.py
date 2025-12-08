@@ -1,5 +1,5 @@
-from .SigmaConstraint import SigmaConstraint
+from .CIAO import CIAO
 
 __all__ = [
-    'SigmaConstraint'
+    'CIAO'
 ]

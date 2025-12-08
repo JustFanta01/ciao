@@ -15,6 +15,7 @@ class OptimizationProblem():
         self.N = len(agents)
         self.d = agents[0].zz.shape[0] # flatten dimension!
 
+    @dispatch()
     def sigma(self):
         
         """ $$ \sigma(\textbf{z}) := \frac{\sum_{i=0}^{N} \phi_i(z_i)}{N}  $$ """
@@ -26,6 +27,22 @@ class OptimizationProblem():
 
         # print(f"sigma = avg_offload_ratio = {sigma}")
         return sigma
+
+    @dispatch(np.ndarray)
+    def sigma(self, zz):
+        assert zz.shape == (self.N, self.d)
+        
+        """ $$ \sigma(\textbf{z}) := \frac{\sum_{i=0}^{N} \phi_i(z_i)}{N}  $$ """
+
+        sigma = 0
+        for i, agent_i in enumerate(self.agents):
+            sigma += agent_i.phi(zz[i])
+        sigma /= self.N
+
+        # print(f"sigma = avg_offload_ratio = {sigma}")
+        return sigma
+
+
 
     def centralized_cost_fn(self):
         
@@ -207,6 +224,11 @@ class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
     def check(self, zz, ss):
         return self.global_residual(ss) <= 0
 
+    @dispatch()
+    def global_residual(self):
+        return self.sigma() - self.c
+
+    @dispatch(np.ndarray)
     def global_residual(self, ss):
         return ss - self.c
 
