@@ -5,7 +5,8 @@ import os
 from typing import Optional
 
 from models.algorithm_interface import RunResult
-from algorithms.sigma_constraints.distributed import SigmaConstraint
+from algorithms.sigma_constraints.centralized import SigmaConstraint
+from algorithms.sigma_constraints.distributed import CIAO
 from models.phi import IdentityFunction, LinearFunction, SquareComponentWiseFunction
 from models.optimization_problem import ConstrainedSigmaProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -147,26 +148,65 @@ def main():
         
         problem = ConstrainedSigmaProblem(agents, adj, seed, constraint)
         return problem
+    
+
+    # -----------------------
+    # |     CENTRALIZED     |
+    # -----------------------
+    if True:
+        problem = setup_problem()
+        distributed = SigmaConstraint(problem)
+        args = {
+            "seed": seed,
+            "max_iter": 2000,
+            "stepsize": 0.01,
+            "dual_stepsize": 0.01
+        }
+        algo_params = SigmaConstraint.AlgorithmParams(**args)
+        result_centralized = distributed.run(algo_params)
+
+        result_centralized.summary()
+
+        plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
+        plotter\
+            .clear()\
+            \
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_lambda_trajectory(semilogy=False)\
+            \
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .plot_lagr_stationarity()\
+            \
+            .plot_kkt_conditions()\
+            .show()
+
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
 
     # -----------------------
     # |     DISTRIBUTED     |
     # -----------------------
     if True:
         problem = setup_problem()
-        distributed = SigmaConstraint(problem)
+        distributed = CIAO(problem)
         args = {
+            "seed": seed,
             "max_iter": 2000,
             "stepsize": 0.01,
-            "seed": seed,
             "beta": 0.05,
             "gamma": 0.05
         }
-        algo_params = SigmaConstraint.AlgorithmParams(**args)
-        result = distributed.run(algo_params)
+        algo_params = CIAO.AlgorithmParams(**args)
+        result_distributed = distributed.run(algo_params)
 
-        result.summary()
+        result_distributed.summary()
 
-        plotter = plots.ConstrainedRunResultPlotter(problem, result)
+        plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
         plotter\
             .clear()\
             \
@@ -190,6 +230,29 @@ def main():
                 .show()
         # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
+
+    # -----------------------
+    # |     COMPARISON      |
+    # -----------------------
+    plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
+    plotter\
+       .clear()\
+        \
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_lambda_trajectory(semilogy=False)\
+        \
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .plot_lagr_stationarity()\
+        .plot_kkt_conditions()\
+        .show()
+
+    plotter._layout = "horizontal"
+    plotter\
+        .clear()\
+        .plot_phase2d()\
+        .show()
 
 if __name__ == "__main__":
     main()

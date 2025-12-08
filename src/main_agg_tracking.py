@@ -20,7 +20,6 @@ def main():
     N = 2  # number of agents
     d = 1  # dimension of the state space
     seed = 3
-    rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
     rng = np.random.default_rng(seed)
@@ -42,7 +41,7 @@ def main():
     # time_rtt = rng.uniform(0,5, size=(N,))
     
     init_state = rng.uniform(0, 1, size=(N, d))
-    # print(f"init_state: {init_state}")
+    print(f"init_state: {init_state}")
 
     def setup_problem():
         agents = []
@@ -62,12 +61,12 @@ def main():
         args = {'edge_probability': 0.45, 'seed': seed}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
     
-        fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-        title = f"Graph and Adj Matrix"
-        fig.suptitle(title)
-        fig.canvas.manager.set_window_title(title)
-        plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
-        plots.show_and_wait(fig)
+        # fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+        # title = f"Graph and Adj Matrix"
+        # fig.suptitle(title)
+        # fig.canvas.manager.set_window_title(title)
+        # plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
+        # plots.show_and_wait(fig)
     
         problem = OptimizationProblem(agents, adj, seed)
         return problem
@@ -83,11 +82,11 @@ def main():
         "seed":seed
     }
     algo_params = CentralizedGradientMethod.AlgorithmParams(**args)
-    result = centralized.run(algo_params)
-    
-    result.summary()
+    result_centralized = centralized.run(algo_params)
 
-    plotter = plots.BaseRunResultPlotter(problem, result)
+    result_centralized.summary()
+
+    plotter = plots.BaseRunResultPlotter(problem, result_centralized)
     plotter\
         .clear()\
         .plot_cost(semilogy=False)\
@@ -101,7 +100,7 @@ def main():
             .clear()\
             .plot_phase2d()\
             .show()
-    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+    # animation.animate_offloading_with_mean(result_centralized, problem.agents, interval=80)
 
     # -----------------------
     # |     DISTRIBUTED     |
@@ -114,11 +113,11 @@ def main():
         "seed":seed
     }
     algo_params = AggregativeTracking.AlgorithmParams(**args)
-    result = distributed.run(algo_params)
+    result_distributed = distributed.run(algo_params)
 
-    result.summary()
+    result_distributed.summary()
 
-    plotter = plots.BaseRunResultPlotter(problem, result)
+    plotter = plots.BaseRunResultPlotter(problem, result_distributed)
     plotter\
         .clear()\
         .plot_cost()\
@@ -132,7 +131,23 @@ def main():
             .clear()\
             .plot_phase2d()\
             .show()
-    
+
+
+    # -----------------------
+    # |     COMPARISON      |
+    # -----------------------
+    plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed])
+    plotter\
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .show()
+
+    plotter\
+        .clear()\
+        .plot_phase2d()\
+        .show()
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!

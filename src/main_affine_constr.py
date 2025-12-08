@@ -6,7 +6,7 @@ from typing import Optional
 
 from models.algorithm_interface import RunResult
 from algorithms.affine_constraints.centralized import AugmentedPrimalDualGradientDescent, ArrowHurwiczUzawaPrimalDualGradientDescent
-from algorithms.affine_constraints.distributed import DuMeng, DuMeng2, DuMeng3, DuMeng4
+from algorithms.affine_constraints.distributed import DuMeng, DuMeng2, DuMeng3, DuMeng4, DuMeng5, DuMeng6
 from models.phi import IdentityFunction
 from models.optimization_problem import AffineCouplingProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
@@ -169,12 +169,12 @@ def main():
         args = {'edge_probability': 0.45, 'seed': seed}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
     
-        # fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-        # title = f"Graph and Adj Matrix"
-        # fig.suptitle(title)
-        # fig.canvas.manager.set_window_title(title)
-        # plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
-        # plots.show_and_wait(fig)
+        fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+        title = f"Graph and Adj Matrix"
+        fig.suptitle(title)
+        fig.canvas.manager.set_window_title(title)
+        plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
+        plots.show_and_wait(fig)
     
         problem = AffineCouplingProblem(agents, adj, seed)
         return problem
@@ -194,10 +194,10 @@ def main():
             "dual_stepsize": 0.05
         }
         algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
-        result = centralized.run(algo_params)
-        result.summary()
+        result_centralized = centralized.run(algo_params)
+        result_centralized.summary()
 
-        plotter = plots.ConstrainedRunResultPlotter(problem, result)
+        plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
         plotter\
             .clear()\
             \
@@ -260,7 +260,7 @@ def main():
     # -----------------------
     if True:
         problem = setup_problem()
-        distributed = DuMeng(problem)
+        distributed = DuMeng5(problem)
         args = {
             "max_iter": 2000,
             "stepsize": 0.01,
@@ -268,10 +268,12 @@ def main():
             "beta": 0.01,
             "gamma": 0.01
         }
-        algo_params = DuMeng.AlgorithmParams(**args)
-        result = distributed.run(algo_params)
+        algo_params = DuMeng5.AlgorithmParams(**args)
+        result_distributed = distributed.run(algo_params)
 
-        plotter = plots.ConstrainedRunResultPlotter(problem, result)
+        result_distributed.summary()
+
+        plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
         plotter\
             .clear()\
             \
@@ -281,8 +283,7 @@ def main():
             \
             .plot_agents_trajectories()\
             .plot_sigma_trajectory()\
-            .plot_aux(["aa_traj"], semilogy=False)\
-            \
+            .plot_aux(["aa_traj", "yy_traj"], semilogy=False)\
             .plot_lagr_stationarity()\
             .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
             .plot_kkt_conditions()\
@@ -293,7 +294,29 @@ def main():
                 .clear()\
                 .plot_phase2d()\
                 .show()
-        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+        # animation.animate_offloading_with_mean(result_distributed, problem.agents, interval=80)
+
+    # -----------------------
+    # |     COMPARISON      |
+    # -----------------------
+    plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed])
+    plotter\
+       .clear()\
+        \
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_lambda_trajectory(semilogy=False)\
+        \
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .plot_lagr_stationarity()\
+        .plot_kkt_conditions()\
+        .show()
+
+    plotter\
+        .clear()\
+        .plot_phase2d()\
+        .show()
 
 
 if __name__ == "__main__":
