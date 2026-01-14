@@ -12,12 +12,16 @@ from models.optimization_problem import ConstrainedSigmaProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
 from models.constraints import LinearConstraint
-from plots import plots_old, plots, animation
+from plots import plots_old, animation, plots
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
 
 import numpy as np
+
+SHOW_CENTRALIZED = False
+SHOW_DISTRIBUTED = False
+SHOW_COMPARISON = True
 
 def generate_B_b_simple(
     # Per-agent params (shape (N,))
@@ -153,20 +157,19 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
-    if True:
-        problem = setup_problem()
-        distributed = SigmaConstraint(problem)
-        args = {
-            "seed": seed,
-            "max_iter": 2000,
-            "stepsize": 0.01,
-            "dual_stepsize": 0.01
-        }
-        algo_params = SigmaConstraint.AlgorithmParams(**args)
-        result_centralized = distributed.run(algo_params)
+    problem = setup_problem()
+    distributed = SigmaConstraint(problem)
+    args = {
+        "seed": seed,
+        "max_iter": 2000,
+        "stepsize": 0.01,
+        "dual_stepsize": 0.01
+    }
+    algo_params = SigmaConstraint.AlgorithmParams(**args)
+    result_centralized = distributed.run(algo_params)
+    result_centralized.summary()
 
-        result_centralized.summary()
-
+    if SHOW_CENTRALIZED:
         plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
         plotter\
             .clear()\
@@ -191,21 +194,21 @@ def main():
     # -----------------------
     # |     DISTRIBUTED     |
     # -----------------------
-    if True:
-        problem = setup_problem()
-        distributed = CIAO(problem)
-        args = {
-            "seed": seed,
-            "max_iter": 2000,
-            "stepsize": 0.01,
-            "beta": 0.05,
-            "gamma": 0.05
-        }
-        algo_params = CIAO.AlgorithmParams(**args)
-        result_distributed = distributed.run(algo_params)
+    problem = setup_problem()
+    distributed = CIAO(problem)
+    args = {
+        "seed": seed,
+        "max_iter": 2000,
+        "stepsize": 0.01,
+        "beta": 0.05,
+        "gamma": 0.05
+    }
+    algo_params = CIAO.AlgorithmParams(**args)
+    result_distributed = distributed.run(algo_params)
 
-        result_distributed.summary()
+    result_distributed.summary()
 
+    if SHOW_DISTRIBUTED:
         plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
         plotter\
             .clear()\
@@ -234,25 +237,31 @@ def main():
     # -----------------------
     # |     COMPARISON      |
     # -----------------------
-    plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
-    plotter\
-       .clear()\
-        \
-        .plot_cost()\
-        .plot_grad_norm()\
-        .plot_lambda_trajectory(semilogy=False)\
-        \
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .plot_lagr_stationarity()\
-        .plot_kkt_conditions()\
-        .show()
-
-    plotter._layout = "horizontal"
-    plotter\
+    if SHOW_COMPARISON:
+        grid_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
+        grid_plotter\
         .clear()\
-        .plot_phase2d()\
-        .show()
+            \
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_lambda_trajectory(semilogy=False)\
+            \
+            .show()
+        
+        grid_plotter\
+            .clear()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .plot_lagr_stationarity()\
+            .plot_kkt_conditions()\
+            \
+            .show()
+
+        horizontal_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+        horizontal_plotter\
+            .clear()\
+            .plot_phase2d()\
+            .show()
 
 if __name__ == "__main__":
     main()

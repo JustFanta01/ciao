@@ -95,7 +95,8 @@ class AggregativeTracking(Algorithm):
                 agent_i["vv"] = vv_k_plus_1[i]
 
         return RunResult (
-            algorithm_name = type(self).__name__,
+            algorithm_name="AT",
+            algorithm_fullname=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad.get(),
             cost_traj = collector_cost.get(),

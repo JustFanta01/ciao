@@ -130,6 +130,7 @@ class SigmaConstraint(Algorithm):
 
         result = RunResult(
             algorithm_name=type(self).__name__,
+            algorithm_fullname=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_f.get(),
             cost_traj = collector_cost.get(),

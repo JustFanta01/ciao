@@ -83,6 +83,7 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
             # $$ \sum_{i=0}^{m} \lambda_i \nabla g(x) $$
             
             grad_lamda_times_constr = np.zeros((N*d,))
+            # TODO: double check this part
             for i in range(m):
                 t = lamda_k[i] * A[i].T # scalar * (N*d,)
                 assert t.shape == (N*d,), f"t shape {t.shape}, expected {(N*d,)}"
@@ -126,7 +127,8 @@ class ArrowHurwiczUzawaPrimalDualGradientDescent(Algorithm):
             self.lamda = lambda_k_plus_1
 
         result = RunResult(
-            algorithm_name=type(self).__name__,
+            algorithm_name="AHUPDGD",
+            algorithm_fullname=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_f.get(),
             cost_traj = collector_cost.get(),

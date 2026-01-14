@@ -175,9 +175,6 @@ class DuMeng6(Algorithm):
                 
                 ll_k_plus_1[i] = np.maximum(0.0, aa_k_plus_1[i]) # ReLU
                 
-
-
-
                 total_cost += cost_i
                 
                 total_grad_ell[i] = grad_ell
@@ -236,6 +233,7 @@ class DuMeng6(Algorithm):
 
         return RunResult (
             algorithm_name=type(self).__name__,
+            algorithm_fullname=type(self).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_ell.get(),
             cost_traj = collector_cost.get(),

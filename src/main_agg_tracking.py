@@ -15,6 +15,9 @@ from plots import plots, animation
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
 
+SHOW_CENTRALIZED = True
+SHOW_DISTRIBUTED = True
+SHOW_COMPARISON = True
 
 def main():
     N = 2  # number of agents
@@ -86,21 +89,22 @@ def main():
 
     result_centralized.summary()
 
-    plotter = plots.BaseRunResultPlotter(problem, result_centralized)
-    plotter\
-        .clear()\
-        .plot_cost(semilogy=False)\
-        .plot_grad_norm()\
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .show()
-
-    if N == 2 and d == 1:
+    if SHOW_CENTRALIZED:
+        plotter = plots.BaseRunResultPlotter(problem, result_centralized)
         plotter\
             .clear()\
-            .plot_phase2d()\
+            .plot_cost(semilogy=False)\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
             .show()
-    # animation.animate_offloading_with_mean(result_centralized, problem.agents, interval=80)
+
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
+        # animation.animate_offloading_with_mean(result_centralized, problem.agents, interval=80)
 
     # -----------------------
     # |     DISTRIBUTED     |
@@ -117,38 +121,40 @@ def main():
 
     result_distributed.summary()
 
-    plotter = plots.BaseRunResultPlotter(problem, result_distributed)
-    plotter\
-        .clear()\
-        .plot_cost()\
-        .plot_grad_norm()\
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .show()
-
-    if N == 2 and d == 1:
+    if SHOW_DISTRIBUTED:
+        plotter = plots.BaseRunResultPlotter(problem, result_distributed)
         plotter\
             .clear()\
-            .plot_phase2d()\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
             .show()
 
+        if N == 2 and d == 1:
+            plotter\
+                .clear()\
+                .plot_phase2d()\
+                .show()
 
     # -----------------------
     # |     COMPARISON      |
     # -----------------------
-    plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed])
-    plotter\
-        .plot_cost()\
-        .plot_grad_norm()\
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .show()
+    if SHOW_COMPARISON:
+        grid_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
+        grid_plotter\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_sigma_trajectory()\
+            .show()
 
-    plotter\
-        .clear()\
-        .plot_phase2d()\
-        .show()
-    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+        horizontal_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+        horizontal_plotter\
+            .clear()\
+            .plot_phase2d()\
+            .show()
+        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!
     # sbar_bias = np.linalg.norm(np.mean(ss_distr[-1, :, 0]) - np.mean(zz_distr[-1, :, 0]))

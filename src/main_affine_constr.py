@@ -19,6 +19,10 @@ from utils import graph_utils
 
 import numpy as np
 
+SHOW_CENTRALIZED = True
+SHOW_DISTRIBUTED = True
+SHOW_COMPARISON = True
+
 def generate_B_b_simple(
     # Per-agent params (shape (N,))
     W_nom_GF: np.ndarray,          # job size in MFLOPs (without offload)
@@ -181,22 +185,22 @@ def main():
 
     # -----------------------
     # |     CENTRALIZED     |
-    # -----------------------
-    if True:
-        problem = setup_problem()
+    # -----------------------    
+    problem = setup_problem()
 
-        centralized = AugmentedPrimalDualGradientDescent(problem)
-        args = {
-            "max_iter": 2000, 
-            "stepsize": 0.01,
-            "seed": seed,
-            "rho": 3,
-            "dual_stepsize": 0.05
-        }
-        algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
-        result_centralized = centralized.run(algo_params)
-        result_centralized.summary()
+    centralized = AugmentedPrimalDualGradientDescent(problem)
+    args = {
+        "max_iter": 2000, 
+        "stepsize": 0.01,
+        "seed": seed,
+        "rho": 3,
+        "dual_stepsize": 0.05
+    }
+    algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
+    result_centralized = centralized.run(algo_params)
+    result_centralized.summary()
 
+    if SHOW_CENTRALIZED:
         plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
         plotter\
             .clear()\
@@ -258,21 +262,20 @@ def main():
     # -----------------------
     # |     DISTRIBUTED     |
     # -----------------------
-    if True:
-        problem = setup_problem()
-        distributed = DuMeng5(problem)
-        args = {
-            "max_iter": 2000,
-            "stepsize": 0.01,
-            "seed": seed,
-            "beta": 0.01,
-            "gamma": 0.01
-        }
-        algo_params = DuMeng5.AlgorithmParams(**args)
-        result_distributed = distributed.run(algo_params)
+    problem = setup_problem()
+    distributed = DuMeng5(problem)
+    args = {
+        "max_iter": 2000,
+        "stepsize": 0.01,
+        "seed": seed,
+        "beta": 0.01,
+        "gamma": 0.01
+    }
+    algo_params = DuMeng5.AlgorithmParams(**args)
+    result_distributed = distributed.run(algo_params)
+    result_distributed.summary()
 
-        result_distributed.summary()
-
+    if SHOW_DISTRIBUTED:
         plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
         plotter\
             .clear()\
@@ -299,24 +302,28 @@ def main():
     # -----------------------
     # |     COMPARISON      |
     # -----------------------
-    plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed])
-    plotter\
-       .clear()\
-        \
-        .plot_cost()\
-        .plot_grad_norm()\
-        .plot_lambda_trajectory(semilogy=False)\
-        \
-        .plot_agents_trajectories()\
-        .plot_sigma_trajectory()\
-        .plot_lagr_stationarity()\
-        .plot_kkt_conditions()\
-        .show()
+    if SHOW_COMPARISON:
+        grid_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
+        grid_plotter\
+            .clear()\
+            .plot_cost()\
+            .plot_grad_norm()\
+            .plot_agents_trajectories()\
+            .plot_lambda_trajectory(semilogy=False)\
+            .show()
+            
+        grid_plotter\
+            .clear()\
+            .plot_sigma_trajectory()\
+            .plot_lagr_stationarity()\
+            .plot_kkt_conditions()\
+            .show()
 
-    plotter\
-        .clear()\
-        .plot_phase2d()\
-        .show()
+        horizontal_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+        horizontal_plotter\
+            .clear()\
+            .plot_phase2d()\
+            .show()
 
 
 if __name__ == "__main__":
