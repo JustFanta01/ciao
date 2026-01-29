@@ -242,6 +242,7 @@ class DuMeng2(Algorithm):
         return RunResult (
             algorithm_name=type(self).__name__,
             algorithm_fullname=type(self).__name__,
+            algorithm_module=self.__class__.__module__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_ell.get(),
             cost_traj = collector_cost.get(),

@@ -221,6 +221,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
         result = RunResult(
             algorithm_name="APDGD",
             algorithm_fullname=type(self).__name__,
+            algorithm_module=self.__class__.__module__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_f.get(), # TODO: quello di f?
             cost_traj = collector_cost.get(),

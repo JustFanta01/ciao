@@ -75,6 +75,7 @@ class CentralizedGradientMethod(Algorithm):
         result = RunResult(
             algorithm_name="GM",
             algorithm_fullname=type(self).__name__,
+            algorithm_module=self.__class__.__module__,
             zz_traj=collector_zz.get(),
             cost_traj=collector_cost.get(), 
             grad_traj=collector_grad.get(),

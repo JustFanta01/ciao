@@ -19,9 +19,13 @@ from utils import graph_utils
 
 import numpy as np
 
-SHOW_CENTRALIZED = True
-SHOW_DISTRIBUTED = True
-SHOW_COMPARISON = True
+SHOW_CENTRALIZED = False
+SHOW_DISTRIBUTED = False
+SHOW_COMPARISON = False
+
+SAVE_CENTRALIZED = True
+SAVE_DISTRIBUTED = True
+SAVE_COMPARISON = True
 
 def generate_B_b_simple(
     # Per-agent params (shape (N,))
@@ -134,23 +138,23 @@ def main():
     Mem_cloud_GB = 3
 
     # [ cloud constraints ]
-    # B_list, b_list, b_sum = generate_B_b_simple(
-    #     W_nom_GF=W_nom_GF[0:N],
-    #     M_job_GB=M_job_GB[0:N],
-    #     S_GB=S_GB[0:N],
-    #     gamma_GB_per_GF=gamma_GB_per_GF[0:N],
-    #     T=T,
-    #     Pcloud_GFps=Pcloud_GFps,
-    #     Mem_cloud_GB=Mem_cloud_GB,
-    #     BWcloud_GBps=BWcloud_GBps,
-    #     equal_split=True  # set False and pass w_* to customize splits
-    # )
+    B_list, b_list, b_sum = generate_B_b_simple(
+        W_nom_GF=W_nom_GF[0:N],
+        M_job_GB=M_job_GB[0:N],
+        S_GB=S_GB[0:N],
+        gamma_GB_per_GF=gamma_GB_per_GF[0:N],
+        T=T,
+        Pcloud_GFps=Pcloud_GFps,
+        Mem_cloud_GB=Mem_cloud_GB,
+        BWcloud_GBps=BWcloud_GBps,
+        equal_split=True  # set False and pass w_* to customize splits
+    )
 
     # [ simple test constraints ]
-    B_list = np.ones((N,m,d))
-    B_list[0] = np.array([1])
-    B_list[1] = np.array([2])
-    b_list = np.ones((N,m)) * 0.5
+    # B_list = np.ones((N,m,d))
+    # B_list[0] = np.array([1])
+    # B_list[1] = np.array([2])
+    # b_list = np.ones((N,m)) * 0.5
 
     def setup_problem():
         agents = []
@@ -200,8 +204,57 @@ def main():
     result_centralized = centralized.run(algo_params)
     result_centralized.summary()
 
+    plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
+    filename = plots.plot_filename_from_result(result_centralized, "perf")
+    plotter\
+        .clear()\
+        \
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_lambda_trajectory(semilogy=False)\
+        \
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .plot_lagr_stationarity()\
+        \
+        .plot_kkt_conditions()
     if SHOW_CENTRALIZED:
+        plotter.show()
+    if SAVE_CENTRALIZED:
+        plotter.save(filename)
+    
+    if N == 2 and d == 1:
+        filename = plots.plot_filename_from_result(result_centralized, "phase2d")
+        plotter\
+            .clear()\
+            .plot_phase2d()
+        if SHOW_CENTRALIZED:
+            plotter.show()
+        if SAVE_CENTRALIZED:
+            plotter.save(filename)
+            
+    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+
+    if False:
+        # -----------------------
+        # |     CENTRALIZED     |
+        # -----------------------
+        problem = setup_problem()
+
+        centralized = ArrowHurwiczUzawaPrimalDualGradientDescent(problem)
+        args = {
+            "max_iter": 2000, 
+            "stepsize": 0.01,
+            "seed": seed,
+            "rho": 3,
+            "dual_stepsize": 0.01
+        }
+        algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
+        result_centralized = centralized.run(algo_params)
+        result_centralized.summary()
+
         plotter = plots.ConstrainedRunResultPlotter(problem, result_centralized)
+        filename = plots.plot_filename_from_result(result_centralized, "perf")
         plotter\
             .clear()\
             \
@@ -213,51 +266,21 @@ def main():
             .plot_sigma_trajectory()\
             .plot_lagr_stationarity()\
             \
-            .plot_kkt_conditions()\
-            .show()
+            .plot_kkt_conditions()
+        if SHOW_CENTRALIZED:
+            plotter.show()
+        if SAVE_CENTRALIZED:
+            plotter.save(filename)
         
         if N == 2 and d == 1:
+            filename = plots.plot_filename_from_result(result_centralized, "perf")
             plotter\
                 .clear()\
-                .plot_phase2d()\
-                .show()
-        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
-
-    # -----------------------
-    # |     CENTRALIZED     |
-    # -----------------------
-    if False:
-        problem = setup_problem()
-        centralized = ArrowHurwiczUzawaPrimalDualGradientDescent(problem)
-        args = {
-            "max_iter": 2000, 
-            "stepsize": 0.001,
-            "seed": seed,
-            "dual_stepsize": 0.001
-        }
-        algo_params = ArrowHurwiczUzawaPrimalDualGradientDescent.AlgorithmParams(**args)
-        result = centralized.run(algo_params)
-        result.summary()
-
-        i1, i2 = 0, 1  # indices of the agents you want to visualize
-        constraints = [
-            ((B_list[i1][k, 0], B_list[i2][k, 0]), b_list[i1][k] + b_list[i2][k])
-            for k in range(B_list[i1].shape[0])
-        ]
-        plots.plot_trajectory_plane_with_affine_constraints(result, constraints)
-
-
-        plotter = plots.ConstrainedRunResultPlotter(result)
-        plotter\
-            .plot_cost()\
-            .plot_grad_norm()\
-            .plot_agents_trajectories()\
-            .plot_sigma_trajectory()\
-            .plot_lagr_stationarity()\
-            .plot_kkt_conditions(semilogy=False)\
-            .plot_lambda(semilogy=False)\
-            .show()
-        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+                .plot_phase2d()
+            if SHOW_CENTRALIZED:
+                plotter.show()
+            if SAVE_CENTRALIZED:
+                plotter.save(filename)
 
     # -----------------------
     # |     DISTRIBUTED     |
@@ -274,56 +297,76 @@ def main():
     algo_params = DuMeng5.AlgorithmParams(**args)
     result_distributed = distributed.run(algo_params)
     result_distributed.summary()
-
+    
+    plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
+    filename = plots.plot_filename_from_result(result_distributed, "perf")
+    plotter\
+        .clear()\
+        \
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_lambda_trajectory(semilogy=False)\
+        \
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()\
+        .plot_aux(["aa_traj", "yy_traj"], semilogy=False)\
+        .plot_lagr_stationarity()\
+        .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
+        .plot_kkt_conditions()
+    
     if SHOW_DISTRIBUTED:
-        plotter = plots.ConstrainedRunResultPlotter(problem, result_distributed)
+        plotter.show()
+    if SAVE_DISTRIBUTED:
+        plotter.save(filename)
+    
+    if N == 2 and d == 1:
+        filename = plots.plot_filename_from_result(result_distributed, "phase2d")
         plotter\
             .clear()\
-            \
-            .plot_cost()\
-            .plot_grad_norm()\
-            .plot_lambda_trajectory(semilogy=False)\
-            \
-            .plot_agents_trajectories()\
-            .plot_sigma_trajectory()\
-            .plot_aux(["aa_traj", "yy_traj"], semilogy=False)\
-            .plot_lagr_stationarity()\
-            .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
-            .plot_kkt_conditions()\
-            .show()
-        
-        if N == 2 and d == 1:
-            plotter\
-                .clear()\
-                .plot_phase2d()\
-                .show()
+            .plot_phase2d()
+        if SHOW_DISTRIBUTED:
+            plotter.show()
+        if SAVE_DISTRIBUTED:
+            plotter.save(filename)
         # animation.animate_offloading_with_mean(result_distributed, problem.agents, interval=80)
 
     # -----------------------
     # |     COMPARISON      |
     # -----------------------
+    results = [result_centralized, result_distributed]
+    grid_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, results, layout="grid")
+    filename = plots.plot_filename_comparison_from_results(results, "perf1")
+    grid_plotter\
+        .clear()\
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_lambda_trajectory(semilogy=False)
     if SHOW_COMPARISON:
-        grid_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
-        grid_plotter\
-            .clear()\
-            .plot_cost()\
-            .plot_grad_norm()\
-            .plot_agents_trajectories()\
-            .plot_lambda_trajectory(semilogy=False)\
-            .show()
-            
-        grid_plotter\
-            .clear()\
-            .plot_sigma_trajectory()\
-            .plot_lagr_stationarity()\
-            .plot_kkt_conditions()\
-            .show()
+        grid_plotter.show()
+    if SAVE_COMPARISON:
+        grid_plotter.save(filename)
 
-        horizontal_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
-        horizontal_plotter\
-            .clear()\
-            .plot_phase2d()\
-            .show()
+    filename = plots.plot_filename_comparison_from_results(results, "perf2")
+    grid_plotter\
+        .clear()\
+        .plot_sigma_trajectory()\
+        .plot_lagr_stationarity()\
+        .plot_kkt_conditions()
+    if SHOW_COMPARISON:
+        grid_plotter.show()
+    if SAVE_COMPARISON:
+        grid_plotter.save(filename)
+
+    horizontal_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+    filename = plots.plot_filename_comparison_from_results(results, "phase2d")
+    horizontal_plotter\
+        .clear()\
+        .plot_phase2d()
+    if SHOW_COMPARISON:
+        horizontal_plotter.show()
+    if SAVE_COMPARISON:
+        horizontal_plotter.save(filename)
 
 
 if __name__ == "__main__":

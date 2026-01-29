@@ -8,6 +8,7 @@ from models.optimization_problem import OptimizationProblem, ConstrainedOptimiza
 from models.algorithm_interface import RunResult
 from matplotlib.patches import Patch, Rectangle
 from plots.timeseries import _timeseries
+from pathlib import Path
 
 def show_graph_and_adj_matrix(fig, axs, graph, adj_matrix=None):
     """
@@ -31,6 +32,38 @@ def show_and_wait(fig=None):
     else:
         fig.canvas.mpl_connect('key_press_event', close)
     plt.show(block=True)
+
+from pathlib import Path
+
+def plot_filename_from_result(
+    run_result,
+    tag: str,
+    img_root: str = "../img",
+    ext: str = "png",
+) -> str:
+    parts = run_result.algorithm_module.split(".")
+
+    if parts[0] == "algorithms":
+        core = parts[1:]   # family, mode, AlgorithmName
+        prefix = "__".join(core)
+    else:
+        prefix = parts[-1]
+
+    return str(Path(img_root) / f"{prefix}__{tag}.{ext}")
+
+def plot_filename_comparison_from_results(
+    results,
+    tag: str,
+    img_root="../img",
+    ext="png",
+) -> str:
+    parts = results[0].algorithm_module.split(".")
+    if parts[0] == "algorithms":
+        family = parts[1]
+    else:
+        family = "misc"
+    return str(Path(img_root) / f"{family}__comparison_{tag}.{ext}")
+
 
 @dataclass
 class PlotTask:

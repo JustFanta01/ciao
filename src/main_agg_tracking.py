@@ -15,9 +15,13 @@ from plots import plots, animation
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import graph_utils
 
-SHOW_CENTRALIZED = True
-SHOW_DISTRIBUTED = True
-SHOW_COMPARISON = True
+SHOW_CENTRALIZED = False
+SHOW_DISTRIBUTED = False
+SHOW_COMPARISON = False
+
+SAVE_CENTRALIZED = True
+SAVE_DISTRIBUTED = True
+SAVE_COMPARISON = True
 
 def main():
     N = 2  # number of agents
@@ -89,21 +93,28 @@ def main():
 
     result_centralized.summary()
 
+    plotter = plots.BaseRunResultPlotter(problem, result_centralized)
+    filename = plots.plot_filename_from_result(result_centralized, "perf")
+    plotter\
+        .clear()\
+        .plot_cost(semilogy=False)\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()
     if SHOW_CENTRALIZED:
-        plotter = plots.BaseRunResultPlotter(problem, result_centralized)
+        plotter.show()
+    if SAVE_CENTRALIZED:
+        plotter.save(filename)
+
+    if N == 2 and d == 1:
+        filename = plots.plot_filename_from_result(result_centralized, "phase2d")
         plotter\
             .clear()\
-            .plot_cost(semilogy=False)\
-            .plot_grad_norm()\
-            .plot_agents_trajectories()\
-            .plot_sigma_trajectory()\
-            .show()
-
-        if N == 2 and d == 1:
-            plotter\
-                .clear()\
-                .plot_phase2d()\
-                .show()
+            .plot_phase2d()
+        if SHOW_CENTRALIZED:
+            plotter.show()
+        if SAVE_CENTRALIZED:
+            plotter.save(filename)
         # animation.animate_offloading_with_mean(result_centralized, problem.agents, interval=80)
 
     # -----------------------
@@ -121,40 +132,58 @@ def main():
 
     result_distributed.summary()
 
+    
+    plotter = plots.BaseRunResultPlotter(problem, result_distributed)
+    filename = plots.plot_filename_from_result(result_distributed, "perf")
+    plotter\
+        .clear()\
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()
     if SHOW_DISTRIBUTED:
-        plotter = plots.BaseRunResultPlotter(problem, result_distributed)
+        plotter.show()
+    if SAVE_DISTRIBUTED:
+        plotter.save(filename)
+        
+
+    if N == 2 and d == 1:
+        filename = plots.plot_filename_from_result(result_distributed, "phase2d")
         plotter\
             .clear()\
-            .plot_cost()\
-            .plot_grad_norm()\
-            .plot_agents_trajectories()\
-            .plot_sigma_trajectory()\
-            .show()
-
-        if N == 2 and d == 1:
-            plotter\
-                .clear()\
-                .plot_phase2d()\
-                .show()
+            .plot_phase2d()
+        
+        if SHOW_DISTRIBUTED:
+            plotter.show()
+        if SAVE_DISTRIBUTED:
+            plotter.save(filename)
 
     # -----------------------
     # |     COMPARISON      |
     # -----------------------
+    results = [result_centralized, result_distributed]
+    grid_plotter = plots.ComparisonBaseRunResultPlotter(problem, results, layout="grid")
+    filename = plots.plot_filename_comparison_from_results(results, "perf")
+    grid_plotter\
+        .plot_cost()\
+        .plot_grad_norm()\
+        .plot_agents_trajectories()\
+        .plot_sigma_trajectory()
     if SHOW_COMPARISON:
-        grid_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="grid")
-        grid_plotter\
-            .plot_cost()\
-            .plot_grad_norm()\
-            .plot_agents_trajectories()\
-            .plot_sigma_trajectory()\
-            .show()
+        grid_plotter.show()
+    if SAVE_COMPARISON:
+        grid_plotter.save(filename)
 
-        horizontal_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
-        horizontal_plotter\
-            .clear()\
-            .plot_phase2d()\
-            .show()
-        # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
+    horizontal_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+    filename = plots.plot_filename_comparison_from_results(results, "phase2d")
+    horizontal_plotter\
+        .clear()\
+        .plot_phase2d()
+    if SHOW_COMPARISON:
+        horizontal_plotter.show()
+    if SAVE_COMPARISON:
+        horizontal_plotter.save(filename)
+    # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!
     # sbar_bias = np.linalg.norm(np.mean(ss_distr[-1, :, 0]) - np.mean(zz_distr[-1, :, 0]))
