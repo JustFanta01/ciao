@@ -27,80 +27,6 @@ SAVE_CENTRALIZED = True
 SAVE_DISTRIBUTED = True
 SAVE_COMPARISON = True
 
-def generate_B_b_simple(
-    # Per-agent params (shape (N,))
-    W_nom_GF: np.ndarray,          # job size in MFLOPs (without offload)
-    M_job_GB: np.ndarray,          # memory footprint on cloud (MB) if offloaded
-    S_GB: np.ndarray,              # fixed MB per offload request
-    gamma_GB_per_GF: np.ndarray,   # MB per MFLOP for offloaded data
-    # Cloud/global budgets
-    T: float,                      # time window [s]
-    Pcloud_GFps: float,            # cloud peak compute [MFLOPs/s]
-    Mem_cloud_GB: float,           # cloud memory budget [MB]
-    BWcloud_GBps: Optional[float] = None,  # cloud ingress bandwidth [MB/s]; None => no net limit
-    # Private RHS split (equal by default; pass weights to customize)
-    equal_split: bool = True,
-    w_comp: Optional[np.ndarray] = None,   # weights per metric (sum to 1)
-    w_net:  Optional[np.ndarray] = None,
-    w_mem:  Optional[np.ndarray] = None,
-):
-    """
-    Returns:
-      B_list: list of N arrays, each (3,1): [compute_GF; net_GB; mem_GB] for z_i=1
-      b_list: list of N arrays, each (3,)  : private RHS vectors per agent
-      b_sum : (3,) aggregate RHS = sum_i b_i
-    Coupling (component-wise):
-        sum_i (B_i * z_i) <= sum_i b_i
-    """
-    # --- sanitize inputs ---
-    W_nom_GF = np.asarray(W_nom_GF, dtype=float)
-    M_job_GB = np.asarray(M_job_GB, dtype=float)
-    S_GB     = np.asarray(S_GB,     dtype=float)
-    gamma_GB_per_GF = np.asarray(gamma_GB_per_GF, dtype=float)
-    N = W_nom_GF.size
-
-    # --- per-agent B_i (3x1), purely physical ---
-    # 1) compute MFLOPs to execute on cloud if z_i=1
-    B_comp_GF = W_nom_GF
-    # 2) network
-    B_net_GB  = S_GB + gamma_GB_per_GF * W_nom_GF
-    # 3) memory
-    B_mem_GB  = M_job_GB
-
-    B_list = [np.array([[B_comp_GF[i]], [B_net_GB[i]], [B_mem_GB[i]]], dtype=float)
-              for i in range(N)]
-
-    # --- global budgets (not exposed directly to agents) ---
-    b_comp_global = float(Pcloud_GFps) * float(T)                 # MFLOPs
-    b_net_global  = (float(BWcloud_GBps) * float(T)) if (BWcloud_GBps is not None) else np.inf
-    b_mem_global  = float(Mem_cloud_GB)
-
-    # --- private RHS split (equal or weighted) ---
-    def _weights_or_uniform(w):
-        if equal_split or w is None:
-            return np.ones(N, dtype=float) / N
-        w = np.asarray(w, dtype=float)
-        if w.shape != (N,) or not np.isclose(w.sum(), 1.0):
-            raise ValueError("Weights must be shape (N,) and sum to 1.")
-        return w
-
-    w_comp = _weights_or_uniform(w_comp)
-    w_net  = _weights_or_uniform(w_net)
-    w_mem  = _weights_or_uniform(w_mem)
-
-    b_list = []
-    for i in range(N):
-        b_i = np.array([
-            w_comp[i] * b_comp_global,   # MFLOPs
-            w_net[i]  * b_net_global,    # MB
-            w_mem[i]  * b_mem_global     # MB
-        ], dtype=float)
-        b_list.append(b_i)
-
-    b_sum = np.sum(np.vstack(b_list), axis=0)  # (3,)
-
-    return B_list, b_list, b_sum   
-
 def main():
     N = 2  # number of agents
     d = 1  # dimension of the state space
@@ -123,8 +49,6 @@ def main():
     # init_state = np.array([[0.1],[0.2], []])
     # print(f"init_state: {init_state}")
 
-    # [ define constraints ]
-    
     def setup_problem():
         agents = []
         for i in range(N):
@@ -146,12 +70,13 @@ def main():
         args = {'edge_probability': 0.45, 'seed': seed}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
     
-        # fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-        # title = f"Graph and Adj Matrix"
-        # fig.suptitle(title)
-        # fig.canvas.manager.set_window_title(title)
-        # plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
-        # plots.show_and_wait(fig)
+        if SHOW_DISTRIBUTED:
+            fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+            title = f"Graph and Adj Matrix"
+            fig.suptitle(title)
+            fig.canvas.manager.set_window_title(title)
+            plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
+            plots.show_and_wait(fig)
     
         
         problem = ConstrainedSigmaProblem(agents, adj, seed, constraint)

@@ -38,7 +38,7 @@ from pathlib import Path
 def plot_filename_from_result(
     run_result,
     tag: str,
-    img_root: str = "../img",
+    img_root: str = "../output",
     ext: str = "png",
 ) -> str:
     parts = run_result.algorithm_module.split(".")
@@ -54,7 +54,7 @@ def plot_filename_from_result(
 def plot_filename_comparison_from_results(
     results,
     tag: str,
-    img_root="../img",
+    img_root="../output",
     ext="png",
 ) -> str:
     parts = results[0].algorithm_module.split(".")
@@ -81,6 +81,8 @@ class BaseRunResultPlotter:
         self.result = result
         self._tasks: List[PlotTask] = []
         self._figsize = figsize
+        self._width_col = 3
+        self._height_row = 3
         self._registry: Dict[str, Callable] = {
             "cost": self._render_cost,
             "grad_norm": self._render_grad_norm,
@@ -161,8 +163,9 @@ class BaseRunResultPlotter:
         
         cols = math.ceil(math.sqrt(n))
         rows = math.ceil(n / cols)
-        
-        fig, axes = plt.subplots(rows, cols, figsize=self._figsize, layout="constrained")
+
+        s = self._figsize if self._figsize else (self._width_col * cols, self._height_row * rows)
+        fig, axes = plt.subplots(rows, cols, figsize=s, layout="constrained")
         axes = np.atleast_1d(axes).ravel()
 
         for ax, task in zip(axes, self._tasks):
@@ -441,7 +444,8 @@ class BaseRunResultPlotter:
         ax.set_xlim(x_min - pad, x_max + pad)
         ax.set_ylim(y_min - pad, y_max + pad)
         
-        plt.axis("equal")
+        # plt.axis("equal")
+        ax.set_aspect("equal", adjustable="box")
 
         return {
             "contours_proxy": contours_proxy,
@@ -692,6 +696,8 @@ class ComparisonBaseRunResultPlotter:
 
         self._tasks: List[PlotTask] = []
         self._figsize = figsize
+        self._width_col = 3
+        self._height_row = 3
         self._registry: Dict[str, Callable] = {
             "cost": self._render_cost,
             "grad_norm": self._render_grad_norm,
@@ -768,8 +774,9 @@ class ComparisonBaseRunResultPlotter:
         else:
             raise ValueError(f"Unknown layout: {self._layout}")
 
-        fig, axes = plt.subplots(rows, cols, figsize=self._figsize) # layout="constrained")
-        fig.tight_layout(pad=2)
+        s = self._figsize if self._figsize else (self._width_col * cols, self._height_row * rows)
+        fig, axes = plt.subplots(rows, cols, figsize=s, layout="constrained")
+        # fig.tight_layout(pad=2)
         axes = np.atleast_1d(axes)
 
         # normalizzazione shape: 1D -> (rows, cols)

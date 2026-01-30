@@ -19,13 +19,13 @@ from utils import graph_utils
 
 import numpy as np
 
-SHOW_CENTRALIZED = False
-SHOW_DISTRIBUTED = False
-SHOW_COMPARISON = False
+SHOW_CENTRALIZED = False # True
+SHOW_DISTRIBUTED = False # True
+SHOW_COMPARISON  = False # True
 
-SAVE_CENTRALIZED = True
-SAVE_DISTRIBUTED = True
-SAVE_COMPARISON = True
+SAVE_CENTRALIZED = True # False
+SAVE_DISTRIBUTED = True # False
+SAVE_COMPARISON  = True # False
 
 def generate_B_b_simple(
     # Per-agent params (shape (N,))
@@ -177,12 +177,13 @@ def main():
         args = {'edge_probability': 0.45, 'seed': seed}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
     
-        fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-        title = f"Graph and Adj Matrix"
-        fig.suptitle(title)
-        fig.canvas.manager.set_window_title(title)
-        plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
-        plots.show_and_wait(fig)
+        if SHOW_DISTRIBUTED:
+            fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+            title = f"Graph and Adj Matrix"
+            fig.suptitle(title)
+            fig.canvas.manager.set_window_title(title)
+            plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
+            plots.show_and_wait(fig)
     
         problem = AffineCouplingProblem(agents, adj, seed)
         return problem
