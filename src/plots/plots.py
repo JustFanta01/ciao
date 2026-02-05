@@ -49,7 +49,9 @@ def plot_filename_from_result(
     else:
         prefix = parts[-1]
 
-    return str(Path(img_root) / f"{prefix}__{tag}.{ext}")
+    cost_fn_name = run_result.cost_fn_name[:10]
+
+    return str(Path(img_root) / f"{prefix}__{cost_fn_name}__{tag}.{ext}")
 
 def plot_filename_comparison_from_results(
     results,
@@ -62,7 +64,10 @@ def plot_filename_comparison_from_results(
         family = parts[1]
     else:
         family = "misc"
-    return str(Path(img_root) / f"{family}__comparison_{tag}.{ext}")
+
+    cost_fn_name = results[0].cost_fn_name[:10]
+
+    return str(Path(img_root) / f"{family}__comp__{cost_fn_name}__{tag}.{ext}")
 
 
 @dataclass
@@ -424,6 +429,7 @@ class BaseRunResultPlotter:
         else:
             contours_proxy = None
         
+        ax.set_title("Trajectory in (z1, z2) plane with constraints")
         # ===== Plot constraints & unfeasible region =====
         has_constraints = isinstance(problem, ConstrainedOptimizationProblem)
         if has_constraints:
@@ -435,7 +441,6 @@ class BaseRunResultPlotter:
 
             problem.draw_constraints(ax)
 
-        ax.set_title("Trajectory in (z1, z2) plane with multiple affine constraints")
         ax.set_xlabel("z1")
         ax.set_ylabel("z2")
         ax.grid(True, ls="--", alpha=0.6)

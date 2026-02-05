@@ -159,13 +159,13 @@ def main():
     def setup_problem():
         agents = []
         for i in range(N):
-            # cost_params = LocalCloudTradeoffCostFunction.CostParams(
-            #     alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
-            # )
-            # cost_fn = LocalCloudTradeoffCostFunction(cost_params)
+            cost_params = LocalCloudTradeoffCostFunction.CostParams(
+                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+            )
+            cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
-            cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
-            cost_fn = QuadraticCostFunction(cost_params)
+            # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
+            # cost_fn = QuadraticCostFunction(cost_params)
             
             lc = LinearConstraint(B_list[i], b_list[i])
 

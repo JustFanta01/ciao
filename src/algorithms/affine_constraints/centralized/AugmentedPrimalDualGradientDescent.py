@@ -222,6 +222,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
             algorithm_name="APDGD",
             algorithm_fullname=type(self).__name__,
             algorithm_module=self.__class__.__module__,
+            cost_fn_name=type(self.problem.agents[0]._cost_fn_obj).__name__,
             zz_traj = collector_zz.get(),
             grad_traj = collector_grad_f.get(), # TODO: quello di f?
             cost_traj = collector_cost.get(),

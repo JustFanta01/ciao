@@ -10,6 +10,7 @@ class RunResult:
     algorithm_name: str
     algorithm_fullname: str
     algorithm_module : str
+    cost_fn_name: str 
     zz_traj: np.ndarray      # (K, N, d)
     grad_traj: np.ndarray    # (K, d)
     cost_traj: np.ndarray    # (K,)
