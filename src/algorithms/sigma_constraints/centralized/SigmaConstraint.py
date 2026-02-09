@@ -83,10 +83,10 @@ class SigmaConstraint(Algorithm):
             grad_lambda_times_constr = np.zeros((N, d))
             for i, agent_i in enumerate(self.problem.agents):
                 Jphi_i = agent_i.nabla_phi()   # shape: (m, d)
-                assert Jphi_i.shape == (m, d), f"Jphi_i shape {Jphi_i.shape}, expected {(m, d)}"
+                assert Jphi_i.shape == (d, m), f"Jphi_i shape {Jphi_i.shape}, expected {(d, m)}"
 
-                # contributo: (1/N) * Jphi_i.T @ lamda_k  -> shape (d,)
-                contrib_i = (1.0 / N) * (Jphi_i.T @ lamda_k)
+                # contributo: (1/N) * Jphi_i @ lamda_k  -> shape (d,)
+                contrib_i = (1.0 / N) * (Jphi_i @ lamda_k) # (d, m) x (m, 1)
                 assert contrib_i.shape == (d,)
 
                 grad_lambda_times_constr[i, :] = contrib_i

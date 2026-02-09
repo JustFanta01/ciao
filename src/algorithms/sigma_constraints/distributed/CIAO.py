@@ -119,14 +119,14 @@ class CIAO(Algorithm):
 
                 # [ zz update ]
                 
-                # $$ z_i^{k+1} = z_i^k - \alpha(\nabla_1 \ell_i(z_i^k, s_i^k) + \nabla \phi_i(z_i^k) v_i^k + \frac{1}{N} \nabla \phi_i(z_i^k) ^T \lambda_i^k ) $$
+                # $$ z_i^{k+1} = z_i^k - \alpha(\nabla_1 \ell_i(z_i^k, s_i^k) + \nabla \phi_i(z_i^k) v_i^k + \frac{1}{N} \nabla \phi_i(z_i^k) \lambda_i^k ) $$
                 
                 nabla_1 = agent_i.nabla_1(agent_i["zz"], agent_i["ss"])
                 nabla_phi = agent_i.nabla_phi(agent_i["zz"])
                 grad_ell = nabla_1 + nabla_phi @ agent_i["vv"]
                 
                 # -------------------- NEW ------------------------------
-                nabla_constr = 1/N * nabla_phi.T @ agent_i["ll"]
+                nabla_constr = 1/N * nabla_phi @ agent_i["ll"]
                 # -------------------------------------------------------
                 grad_L_in_z = grad_ell + nabla_constr
                 zz_k_plus_1[i] = agent_i["zz"] - alpha * grad_L_in_z
