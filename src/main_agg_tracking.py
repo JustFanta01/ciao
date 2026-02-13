@@ -175,15 +175,17 @@ def main():
     if SAVE_COMPARISON:
         grid_plotter.save(filename)
 
-    horizontal_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
-    filename = plots.plot_filename_comparison_from_results(results, "phase2d")
-    horizontal_plotter\
-        .clear()\
-        .plot_phase2d()
-    if SHOW_COMPARISON:
-        horizontal_plotter.show()
-    if SAVE_COMPARISON:
-        horizontal_plotter.save(filename)
+    if N == 2 and d == 1:
+        horizontal_plotter = plots.ComparisonBaseRunResultPlotter(problem, [result_centralized, result_distributed], layout="horizontal")
+        filename = plots.plot_filename_comparison_from_results(results, "phase2d")
+        horizontal_plotter\
+            .clear()\
+            .plot_phase2d()
+        if SHOW_COMPARISON:
+            horizontal_plotter.show()
+        if SAVE_COMPARISON:
+            horizontal_plotter.save(filename)
+    
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
     # TODO: bias del tracker s rispetto alla vera media, puo' essere utile!!!
