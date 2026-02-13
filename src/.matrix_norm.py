@@ -26,13 +26,15 @@ plots.show_and_wait(fig)
 # +---------------------+
 I = np.eye(N)
 J = 1/N * np.ones((N,N))
+print(f"np.linalg.eigvals(I-J): {np.linalg.eigvals(I-J)}")
+print(f"np.linalg.matrix_norm(I-J, ord=2): {np.linalg.matrix_norm(I-J, ord=2)}")
 
 L2 = 0.5 * (I - adj)
 
 # +-----------------+
 # |  SVD  to get $$\mathcal L$$ |
 # +-----------------+
-if False:
+if True:
     U, S, V = np.linalg.svd(L2)
     print("---------[ U ]--------")
     print(U)
@@ -71,3 +73,42 @@ if True:
     print("---------[ M = (I-J)(I-L2) ]--------")
     print(f"np.linalg.eigvals(M): {np.linalg.eigvals(M)}")
     print(f"np.linalg.matrix_norm(M, ord=2): {np.linalg.matrix_norm(M, ord=2)}")
+
+
+if True:
+    N = J@(I-L2)
+    print("---------[ N ]--------")
+    print(N)
+    
+    print("---------[ L2 ]--------")
+    print(f"np.linalg.eigvals(L2): {np.linalg.eigvals(L2)}")
+    print(f"np.linalg.matrix_norm(L2, ord=2): {np.linalg.matrix_norm((L2), ord=2)}")
+    
+    print("---------[ I-L2 ]--------")
+    print(f"np.linalg.eigvals(I-L2): {np.linalg.eigvals(I-L2)}")
+    print(f"np.linalg.matrix_norm(I-L2, ord=2): {np.linalg.matrix_norm((I-L2), ord=2)}")
+    
+
+    print("---------[ N = J(I-L2) ]--------")
+    print(f"np.linalg.eigvals(N): {np.linalg.eigvals(N)}")
+    print(f"np.linalg.matrix_norm(N, ord=2): {np.linalg.matrix_norm(N, ord=2)}")
+
+
+if True:
+    theta = 0.05
+    S = ((1-theta)*I-L2)
+    print("---------[ S ]--------")
+    print(S)
+    
+    print("---------[ L2 ]--------")
+    print(f"np.linalg.eigvals(L2): {np.linalg.eigvals(L2)}")
+    print(f"np.linalg.matrix_norm(L2, ord=2): {np.linalg.matrix_norm((L2), ord=2)}")
+    
+    print("---------[ I-L2 ]--------")
+    print(f"np.linalg.eigvals(I-L2): {np.linalg.eigvals(I-L2)}")
+    print(f"np.linalg.matrix_norm(I-L2, ord=2): {np.linalg.matrix_norm((I-L2), ord=2)}")
+    
+
+    print("---------[ S = ((1-theta)*I-L2) ]--------")
+    print(f"np.linalg.eigvals(S): {np.linalg.eigvals(S)}")
+    print(f"np.linalg.matrix_norm(S, ord=2): {np.linalg.matrix_norm(S, ord=2)}")

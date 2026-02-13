@@ -201,4 +201,4 @@ def _timeseries(
     ax.set_title(title)
     ax.set_xlabel("iterations")
     ax.set_ylabel(ylabel)
-    ax.legend(loc="best")
+    ax.legend(loc="best", fontsize=7, ncol=2, handleheight=2, labelspacing=0.05)
