@@ -5,10 +5,11 @@ from typing import cast
 
 class CIAO(Algorithm):
     class AlgorithmParams(Algorithm.AlgorithmParams):
-        def __init__(self, max_iter: int, stepsize: float, seed: int, beta: float, gamma: float):
+        def __init__(self, max_iter: int, stepsize: float, seed: int, beta: float, gamma: float, theta: float):
             super().__init__(max_iter, stepsize, seed)
             self.beta = beta
             self.gamma = gamma
+            self.theta = theta
     
     def __init__(self, problem: ConstrainedOptimizationProblem):
         super().__init__(problem)
@@ -19,6 +20,7 @@ class CIAO(Algorithm):
         alpha = params.stepsize
         beta = params.beta
         gamma = params.gamma
+        theta = params.theta
         rng = np.random.default_rng(params.seed)
         
         N = self.problem.N
@@ -32,7 +34,7 @@ class CIAO(Algorithm):
             lapl = 0.5 * (np.eye(N) - self.problem.adj)
             lapl = np.kron(lapl, np.eye(m))
 
-            # $$ L(z,\lambda) = \ell(z) + \sum_{i=0}^{m}\lambda_i g_i(z) - \frac{1}{2} \lambda^T L^2 \lambda $$
+            # $$ L(z,\lambda) = \ell(z) + \sum_{i=0}^{m}\lambda_i g_i(z) - \frac{1}{2} \lambda^T \mathcal L^2 \lambda $$
             
             # for the "constr", lambda should be (m,1)
             # for the "regularizer", lambda should be (N*m, 1)
@@ -160,7 +162,7 @@ class CIAO(Algorithm):
                 # sigma_global = self.problem.sigma()
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * (sigma_global - c) + agent_i["nn"]
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * (agent_i["ss"] - c) + agent_i["nn"]
-                aa_k_plus_1[i] = agent_i["ll"] + beta * (ss_k_plus_1[i] - c) + agent_i["nn"]
+                aa_k_plus_1[i] = (1-theta) * agent_i["ll"] + beta * (ss_k_plus_1[i] - c) + agent_i["nn"]
                 
                 # "extragradients"
                 # aa_k_plus_1[i] = agent_i["ll"] + beta * ((2 * agent_i["ss"] - agent_i["ssm1"]) - c) + agent_i["nn"]
@@ -209,7 +211,7 @@ class CIAO(Algorithm):
             # eq (10a): $$ \mathbf{0} = \nabla_1 f(w^*, z^*) + \nabla h(w^*)\mu^* + \Lambda^T\lambda^* $$
             
             # ----------------------------- NEW ----------------------------
-            jacobians = self.problem._block_diag([1/N * ag.nabla_phi().T for ag in self.problem.agents])
+            jacobians = self.problem._block_diag([1/N * ag.nabla_phi() for ag in self.problem.agents])
             stationarity = np.linalg.norm(total_grad_ell.reshape(-1) + jacobians @ ll_k_flat)
             # --------------------------------------------------------------
             

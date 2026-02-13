@@ -139,7 +139,8 @@ def main():
         "max_iter": 2000,
         "stepsize": 0.01,
         "beta": 0.05,
-        "gamma": 0.05
+        "gamma": 0.05,
+        "theta": 0.0001
     }
     algo_params = CIAO.AlgorithmParams(**args)
     result_distributed = distributed.run(algo_params)
