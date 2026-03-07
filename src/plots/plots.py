@@ -391,7 +391,7 @@ class BaseRunResultPlotter:
     @staticmethod
     def _render_phase2d_background(ax, problem, *,
                         show_cost_levels: bool = True,
-                        level_grid: int = 400, 
+                        level_grid: int = 600, 
                         level_count: int = 15, 
                         title: Optional[str]):
         N = problem.N
@@ -421,7 +421,8 @@ class BaseRunResultPlotter:
         # ===== Level sets of the cost =====
         if show_cost_levels:        
             Jmin, Jmax = np.percentile(JJ, 2), np.percentile(JJ, 98)
-            levels = np.linspace(Jmin, Jmax, level_count)
+            # levels = np.linspace(Jmin, Jmax, level_count)
+            levels = np.geomspace(Jmin + 1e-6, Jmax, level_count)
             
             cs = ax.contour(XX, YY, JJ, levels=levels, alpha=0.6)
             ax.clabel(cs, inline=True, fontsize=8)
