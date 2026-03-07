@@ -162,7 +162,7 @@ class DuMeng5(Algorithm):
                 K_P = 1
                 K_I = 1
                 K_D = 0
-                dt = 1 # 1 iteration
+                dt = gamma
 
                 aa_k = np.array([ag["aa"] for ag in self.problem.agents])       # (N, m)
                 # yy_k = np.array([ag["yy"] for ag in self.problem.agents])       # (N, m)
