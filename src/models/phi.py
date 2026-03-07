@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 
 class AggregationContributionFunction(ABC):
     """ $$ \phi_i(\cdot): \mathbb{R}^{n_i} \rightarrow \ \mathbb{R}^{d} $$"""
+    
+    # TODO: fix me, generalize!
     def __init__(self, n_i, d):
         super().__init__()
         self.n_i = n_i
@@ -64,4 +66,25 @@ class SquareComponentWiseFunction(AggregationContributionFunction):
     def nabla(self, zz):
         jac = np.zeros((self.d,self.d))
         np.fill_diagonal(jac, 2 * zz)
+        return jac
+
+class WeightedQuadraticContribution(AggregationContributionFunction):
+    """
+    $$ \phi_i(z_i) = w_i ( z_i + \rho z_i^2 ) $$
+    """
+
+    def __init__(self, d, w, rho):
+        super().__init__(d, d)
+        self.w = w
+        self.rho = rho
+
+    def eval(self, zz):
+        return self.w * (zz + self.rho * zz**2)
+
+    def nabla(self, zz):
+        jac = np.zeros((self.d,self.d))
+        
+        # This function modifies the input array in-place, it does not return a value.
+        np.fill_diagonal(jac, self.w * (1 + 2 * self.rho * zz))
+        
         return jac

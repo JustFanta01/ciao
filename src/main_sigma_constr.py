@@ -7,7 +7,7 @@ from typing import Optional
 from models.algorithm_interface import RunResult
 from algorithms.sigma_constraints.centralized import SigmaConstraint
 from algorithms.sigma_constraints.distributed import CIAO
-from models.phi import IdentityFunction, LinearFunction, SquareComponentWiseFunction
+from models.phi import IdentityFunction, LinearFunction, SquareComponentWiseFunction, WeightedQuadraticContribution
 from models.optimization_problem import ConstrainedSigmaProblem
 from models.cost import LocalCloudTradeoffCostFunction, QuadraticCostFunction
 from models.agent import Agent
@@ -21,30 +21,194 @@ import numpy as np
 
 SHOW_CENTRALIZED = False
 SHOW_DISTRIBUTED = False
-SHOW_COMPARISON = False
+SHOW_COMPARISON  = True
 
-SAVE_CENTRALIZED = True
-SAVE_DISTRIBUTED = True
-SAVE_COMPARISON = True
+SAVE_CENTRALIZED = False
+SAVE_DISTRIBUTED = False
+SAVE_COMPARISON  = False
 
 def main():
     N = 2  # number of agents
+    m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
-    constraint = np.ones(d) * 0.25
+    constraint = np.ones(d) * 1.35
+
     seed = 3
-    # rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
-    rng = np.random.default_rng(seed)
-    alpha = np.ones(N)
-    beta = np.ones(N)
-    energy_task = np.ones(N)*4
-    time_task = np.ones(N)*3
-    energy_tx = np.ones(N)*3
-    time_rtt = np.ones(N)*4
+    # ============================================================
+    # [ design an interior stationary point z_target ]
+    # ============================================================
+    #
+    # We want to choose the parameters so that the UNCONSTRAINED
+    # global objective has stationary point exactly at
+    #
+    # $$ z^\star = z_{\text{target}} \in (0,1)^N. $$
+    #
+    # The global cost is
+    #
+    # $$ f(z) = \sum_{i=1}^N \ell_i(z_i,\sigma(z)) $$
+    #
+    # with
+    #
+    # $$ \sigma(z) = \frac1N \sum_{j=1}^N \phi_j(z_j), $$
+    #
+    # $$ \phi_i(z_i) = w_i \big(z_i + \rho_i z_i^2\big), $$
+    #
+    # and
+    #
+    # $$ \ell_i(z_i,\sigma) = (1-z_i)\ell_i^{loc} + z_i\ell_i^{cloud} + \frac1N\Big(\sigma + \frac{\kappa_i}{2}\sigma^2\Big) + \frac{\gamma_i}{2} z_i^2. $$
+    #
+    # The exact i-th component of the global gradient used by the code is
+    #
+    # $$ \nabla_i f(z) = \nabla_1 \ell_i(z_i,\sigma) + \frac1N \nabla \phi_i(z_i)\sum_{j=1}^N \nabla_2 \ell_j(z_j,\sigma). $$
+    #
+    # Here:
+    #
+    # $$ \nabla_1 \ell_i(z_i,\sigma) = -\ell_i^{loc} + \ell_i^{cloud} + \gamma_i z_i, $$
+    #
+    # $$ \nabla_2 \ell_j(z_j,\sigma) = \frac{1+\kappa_j \sigma}{N}, $$
+    #
+    # $$ \nabla \phi_i(z_i) = w_i(1+2\rho_i z_i). $$
+    #
+    # Therefore at z_target we must enforce
+    #
+    # $$ 0 = -\ell_i^{loc} + \ell_i^{cloud} + \gamma_i z_i^\star + \frac1N w_i(1+2\rho_i z_i^\star)\sum_{j=1}^N \frac{1+\kappa_j\sigma^\star}{N}. $$
+    #
+    # If we define
+    #
+    # $$ \Delta_i := \ell_i^{loc} - \ell_i^{cloud}, $$
+    #
+    # then the exact condition is
+    #
+    # $$ \Delta_i = \gamma_i z_i^\star + \frac1N w_i(1+2\rho_i z_i^\star)\sum_{j=1}^N \frac{1+\kappa_j\sigma^\star}{N}. $$
+    #
+    # After computing Delta, we choose cloud baselines freely and set
+    #
+    # $$ \ell_i^{loc} = \ell_i^{cloud} + \Delta_i. $$
+    #
+    # This makes z_target an exact stationary point of the unconstrained problem.
+    # ============================================================
 
-    # [ define initial condition ]
-    init_state = rng.uniform(0, 1, size=(N, d))
+    # ------------------------------------------------------------
+    # 1) choose an interior target
+    # ------------------------------------------------------------
+    # Keep it safely away from the box boundary for nicer phase plots.
+    z_target = rng.uniform(0.45, 0.85, size=N)
+
+    # ------------------------------------------------------------
+    # 2) choose the contribution-function parameters
+    # ------------------------------------------------------------
+    # $$ \phi_i(z_i) = w_i ( z_i + \rho_i z_i^2 ) $$
+    workload = rng.uniform(1.6, 2.4, size=N)   # $$ w_i $$
+    rho      = rng.uniform(0.4, 1.0, size=N)   # $$ \rho_i $$
+
+    # ------------------------------------------------------------
+    # 3) choose the cost-shape parameters
+    # ------------------------------------------------------------
+    # $$ \ell_i(z_i,\sigma) = ... + \frac1N(\sigma + \frac{\kappa_i}{2}\sigma^2)
+    #    + \frac{\gamma_i}{2} z_i^2 $$
+    #
+    # gamma > 0 is what gives us strong convexity in z.
+    kappa = rng.uniform(0.4, 0.9, size=N)      # $$ \kappa_i $$
+    gamma = rng.uniform(2.5, 4.0, size=N)      # $$ \gamma_i > 0 $$
+
+    # ------------------------------------------------------------
+    # 4) compute sigma at the target
+    # ------------------------------------------------------------
+    
+    # $$ \sigma^\star = \frac1N \sum_i w_i(z_i^\star + \rho_i (z_i^\star)^2) $$
+    
+    sigma_star = (1.0 / N) * np.sum(
+        workload * (z_target + rho * z_target**2)
+    )
+
+    # ------------------------------------------------------------
+    # 5) compute the exact chain-rule factor
+    # ------------------------------------------------------------
+    
+    # $$ S^\star := \sum_{j=1}^N \nabla_2 \ell_j(z_j^\star,\sigma^\star) = \sum_{j=1}^N \frac{1+\kappa_j \sigma^\star}{N}. $$
+    
+    nabla2_at_target = (1.0 + kappa * sigma_star) / N     # shape (N,)
+    S_star = np.sum(nabla2_at_target)                     # scalar
+
+    # ------------------------------------------------------------
+    # 6) compute the exact gap Delta_i = ell_loc_i - ell_cloud_i
+    # ------------------------------------------------------------
+    # Exact stationarity equation:
+    #
+    # $$ \Delta_i = \gamma_i z_i^\star + \frac1N w_i(1+2\rho_i z_i^\star) S^\star. $$
+    Delta = (
+        gamma * z_target
+        + (1.0 / N) * workload * (1.0 + 2.0 * rho * z_target) * S_star
+    )
+
+    # ------------------------------------------------------------
+    # 7) choose cloud baseline costs freely
+    # ------------------------------------------------------------
+    # These are only the "cloud" linear part:
+    #
+    # $$ \ell_i^{cloud} = E_i^{tx} + T_i^{tx}. $$
+    #
+    # Keep them moderate and positive.
+    energy_tx = rng.uniform(0.8, 1.2, size=N)
+    time_tx   = rng.uniform(0.8, 1.2, size=N)
+
+    ell_cloud = energy_tx + time_tx
+
+    # ------------------------------------------------------------
+    # 8) recover the local baseline cost from Delta
+    # ------------------------------------------------------------
+    # $$ \ell_i^{loc} = \ell_i^{cloud} + \Delta_i. $$
+    ell_loc = ell_cloud + Delta
+
+    # Split local cost however you want; only the sum matters for the model.
+    energy_task = 0.5 * ell_loc
+    time_task   = 0.5 * ell_loc
+
+    # ------------------------------------------------------------
+    # 9) sanity checks
+    # ------------------------------------------------------------
+    print("z_target            =", z_target)
+    print("sigma_star          =", sigma_star)
+    print("S_star              =", S_star)
+    print("Delta               =", Delta)
+    print("ell_cloud           =", ell_cloud)
+    print("ell_loc             =", ell_loc)
+
+    # ------------------------------------------------------------
+    # 10) verify the exact stationarity numerically
+    # ------------------------------------------------------------
+    # We evaluate the same gradient formula used by
+    # OptimizationProblem.centralized_gradient_of_cost_fn_of_agent, but directly.
+    #
+    # For each i:
+    #
+    # $$ g_i(z^\star) = -\ell_i^{loc} + \ell_i^{cloud} + \gamma_i z_i^\star + \frac1N w_i(1+2\rho_i z_i^\star) S^\star. $$
+    
+    grad_at_target = (
+        -ell_loc
+        + ell_cloud
+        + gamma * z_target
+        + (1.0 / N) * workload * (1.0 + 2.0 * rho * z_target) * S_star
+    )
+
+    print("grad_at_target      =", grad_at_target)
+    print("||grad_at_target||  =", np.linalg.norm(grad_at_target))
+
+    # Optional: this should be very close to zero numerically.
+    assert np.allclose(grad_at_target, 0.0, atol=1e-10), \
+        "z_target is NOT stationary for the unconstrained global objective."
+
+    # ------------------------------------------------------------
+    # 11) initial condition
+    # ------------------------------------------------------------
+    init_state = rng.uniform(0.0, 1.0, size=(N, d))
+    # init_state = np.zeros(shape=(N,d))
+    # init_state = np.array([[0.25],[0.45]])
+    # print(f"init_state: {init_state}")
+
     # init_state = np.zeros(shape=(N,d))
     # init_state = np.array([[0.1],[0.2], []])
     # print(f"init_state: {init_state}")
@@ -53,14 +217,14 @@ def main():
         agents = []
         for i in range(N):
             cost_params = LocalCloudTradeoffCostFunction.CostParams(
-                alpha[i], beta[i], energy_tx[i], energy_task[i], time_task[i], time_rtt[i]
+                N, energy_task[i], time_task[i], energy_tx[i], time_tx[i], kappa[i], gamma[i]
             )
             cost_fn = LocalCloudTradeoffCostFunction(cost_params)
             
             # cost_params = QuadraticCostFunction.CostParams(cc=np.ones(shape=(d,))) # optimum: z_i = 0.5 (= 1/2 * c)
             # cost_fn = QuadraticCostFunction(cost_params)
             
-            phi_fn = SquareComponentWiseFunction(d)
+            phi_fn = WeightedQuadraticContribution(d, workload[i], rho[i])
             # phi_fn = IdentityFunction(d)
             # phi_fn = LinearFunction(d, np.eye(d) * (2*i + 1))
             agent_i = Agent(i, cost_fn, phi_fn, init_state[i])
@@ -86,6 +250,17 @@ def main():
     # -----------------------
     # |     CENTRALIZED     |
     # -----------------------
+    # [ start feasible - update init_state ]
+    search_zone = 1
+    iteration = 0
+    problem = setup_problem()
+    while not problem.check():
+        print("unfeasible init...")
+        init_state = rng.uniform(0, search_zone, size=(N, d))
+        print(f"init_state: {init_state}")
+        problem = setup_problem()
+        search_zone *= 0.5
+        iteration += 1
     problem = setup_problem()
     distributed = SigmaConstraint(problem)
     args = {
@@ -138,9 +313,9 @@ def main():
         "seed": seed,
         "max_iter": 2000,
         "stepsize": 0.01,
-        "beta": 0.05,
-        "gamma": 0.05,
-        "theta": 0.0001
+        "beta": 0.01,
+        "gamma": 0.01,
+        "theta": 0.0000001
     }
     algo_params = CIAO.AlgorithmParams(**args)
     result_distributed = distributed.run(algo_params)

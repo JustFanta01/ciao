@@ -9,7 +9,7 @@ class CostFunction(ABC):
         ...
 
     @abstractmethod
-    def cost_fn(zz_i, sigma) -> int:...
+    def cost_fn(zz_i, sigma) -> float:...
     
     @abstractmethod
     def nabla_1(zz_i, sigma): ...
@@ -55,7 +55,7 @@ class QuadraticCostFunction(CostFunction):
     def nabla_2(self, zz_i: np.ndarray, sigma: np.ndarray) -> np.ndarray:
         return sigma - self.cost_params.cc
 
-class LocalCloudTradeoffCostFunction(CostFunction):
+class LocalCloudTradeoffCostFunction2(CostFunction):
     @dataclass
     class CostParams(CostFunction.CostParams):
         alpha : float
@@ -124,3 +124,155 @@ class LocalCloudTradeoffCostFunction(CostFunction):
         # $$ \nabla_2 \ell_i (z_i, \sigma(\textbf{z})) = z_i \cdot \alpha \cdot t  $$
         grad = zz_i * self.cost_params.alpha * self.cost_params.time_rtt
         return grad
+
+
+
+# +----------------------------------------------+ 
+# |     superlinear performance degradation      |
+# +----------------------------------------------+
+class LocalCloudTradeoffCostFunction(CostFunction):
+
+    @dataclass
+    class CostParams(CostFunction.CostParams):
+        N            : int     # number of agents
+        energy_task  : float
+        time_task    : float
+        energy_tx    : float
+        time_tx      : float
+        kappa        : float   # congestion slope
+        gamma        : float   # strong convexity
+
+    def __init__(self, cost_params: CostParams):
+        super().__init__()
+        self.cost_params = cost_params
+
+    # ============================================================
+    # COST FUNCTION
+    # ============================================================
+    def cost_fn(self, zz_i, sigma):
+        """
+        $$\ell_i(z_i,\sigma) = (1-z_i)(E^{loc}+T^{loc}) + z_i(E^{tx}+T^{tx}) + \frac{\tau(\sigma)}{N}  + \frac{\gamma}{2} z_i^2 $$
+        
+        $$ \text{with } \tau(\sigma) = \sigma + \frac{\kappa}{2} \sigma^2 $$
+        
+        (performance degradation)
+        """
+
+        local  = self.cost_params.energy_task \
+               + self.cost_params.time_task
+
+        cloud  = self.cost_params.energy_tx \
+               + self.cost_params.time_tx
+
+        tau = sigma + (self.cost_params.kappa / 2) * sigma**2
+
+        cost = (1 - zz_i) * local + zz_i * cloud \
+               + (1 / self.cost_params.N) * tau \
+               + 0.5 * self.cost_params.gamma * zz_i**2
+
+        return cost
+
+    # ============================================================
+    # ∇₁ ℓ_i
+    # ============================================================
+    def nabla_1(self, zz_i, sigma):
+        """
+        $$\nabla_1 \ell_i = -(E^{loc}+T^{loc}) + (E^{cloud}+T^{cloud}) + \gamma z_i$$
+        """
+
+        local = self.cost_params.energy_task \
+              + self.cost_params.time_task
+
+        cloud = self.cost_params.energy_tx \
+              + self.cost_params.time_tx
+
+        grad = -local + cloud \
+               + self.cost_params.gamma * zz_i
+
+        return grad
+
+    # ============================================================
+    # ∇₂ ℓ_i
+    # ============================================================
+    def nabla_2(self, zz_i, sigma):
+        """
+        $$ \nabla_2 \ell_i
+           = \frac{1 + \kappa\sigma}{N}
+        $$
+        """
+        return (1 + self.cost_params.kappa * sigma) / self.cost_params.N
+
+
+# +------------------------------------------ 
+# |     linear performance degradation      |
+# +------------------------------------------ 
+class LocalCloudTradeoffCostFunction1(CostFunction):
+
+    @dataclass
+    class CostParams(CostFunction.CostParams):
+        N            : int     # number of agents
+        energy_task  : float
+        time_task    : float
+        energy_tx    : float
+        time_tx      : float
+        kappa        : float   # congestion slope
+        gamma        : float   # strong convexity
+
+    def __init__(self, cost_params: CostParams):
+        super().__init__()
+        self.cost_params = cost_params
+
+    # ============================================================
+    # COST FUNCTION
+    # ============================================================
+    def cost_fn(self, zz_i, sigma):
+        """
+        $$\ell_i(z_i,\sigma) = (1-z_i)(E^{loc}+T^{loc}) + z_i(E^{tx}+T^{tx}) + \frac{\tau(\sigma)}{N}  + \frac{\gamma}{2} z_i^2 $$
+        
+        $$ \text{with } \tau(\sigma) = \kappa \sigma $$
+        (linear performance degradation / delay)
+        """
+
+        local  = self.cost_params.energy_task \
+               + self.cost_params.time_task
+
+        cloud  = self.cost_params.energy_tx \
+               + self.cost_params.time_tx
+
+        tau = self.cost_params.kappa * sigma
+
+        cost = (1 - zz_i) * local + zz_i * cloud \
+               + (1 / self.cost_params.N) * tau \
+               + 0.5 * self.cost_params.gamma * zz_i**2
+
+        return cost
+
+    # ============================================================
+    # ∇₁ ℓ_i
+    # ============================================================
+    def nabla_1(self, zz_i, sigma):
+        """
+        $$\nabla_1 \ell_i = -(E^{loc}+T^{loc}) + (E^{cloud}+T^{cloud}) + \gamma z_i$$
+        """
+
+        local = self.cost_params.energy_task \
+              + self.cost_params.time_task
+
+        cloud = self.cost_params.energy_tx \
+              + self.cost_params.time_tx
+
+        grad = -local + cloud \
+               + self.cost_params.gamma * zz_i
+
+        return grad
+
+    # ============================================================
+    # ∇₂ ℓ_i
+    # ============================================================
+    def nabla_2(self, zz_i, sigma):
+        """
+        $$ \nabla_2 \ell_i
+           = \frac{\kappa}{N}
+        $$
+        """
+        return (self.cost_params.kappa / self.cost_params.N) * np.ones_like(zz_i)
