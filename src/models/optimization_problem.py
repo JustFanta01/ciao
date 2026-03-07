@@ -153,7 +153,7 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         self.B_global = np.hstack(B_list)                   # shape (m, N*d)
         self.b_global = np.sum(b_list, axis=0)              # shape (m, 1)
 
-        assert self.B_global.shape == (m, self.N*self.d), "" f"B_global.shape was {self.B_global.shape}, expected {(m, self.N*self.d)}"
+        assert self.B_global.shape == (m, self.N*self.d), f"B_global.shape was {self.B_global.shape}, expected {(m, self.N*self.d)}"
         assert self.b_global.shape == (m,), f"b_global.shape was {self.b_global.shape}, expected {(m,)}"
 
         # [ N=5, d=2, m=3
@@ -168,7 +168,7 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
     def check(self):
         z_tot = np.concatenate([ag["zz"] for ag in self.agents])  # shape (N*d,)
         assert z_tot.shape == (self.N*self.d,)
-        return self.global_residual(z_tot) <= 0
+        return np.all(self.global_residual(z_tot) <= 0)
 
     @dispatch(np.ndarray, np.ndarray)
     def check(self, zz, ss):
@@ -176,6 +176,12 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
         feasible = np.all(res <= 0, axis=-1) # (H, W) boolean mask
         return feasible
 
+    @dispatch()
+    def global_residual(self) -> np.ndarray:
+        z_tot = np.concatenate([ag["zz"] for ag in self.agents])  # shape (N*d,)
+        return self.global_residual(z_tot)
+
+    @dispatch(np.ndarray)
     def global_residual(self, zz: np.ndarray) -> np.ndarray:
         # zz: (H, W, N*d), N=2, d=1
         # zz: (N*d,)
@@ -199,12 +205,12 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
             
             if abs(a2) > 1e-12:
                 y_line = (b - a1 * xs) / a2
-                ax.plot(xs, y_line, 'k--', label=f"{a1}·z1 + {a2}·z2 = {b}")
+                ax.plot(xs, y_line, 'k--', label=f"{a1:.2f}·z1 + {a2:.2f}·z2 = {b:.2f}")
             else:
                 if abs(a1) < 1e-12:
                     continue
                 x_line = np.full_like(ys, b / a1)
-                ax.plot(x_line, ys, 'k--', label=f"{a1}·z1 = {b}")
+                ax.plot(x_line, ys, 'k--', label=f"{a1:.2f}·z1 = {b:.2f}")
 
 class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
     def __init__(self, agents:list[Agent], adj:np.ndarray, seed : int, c : np.ndarray):
