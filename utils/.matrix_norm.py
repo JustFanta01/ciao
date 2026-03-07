@@ -93,6 +93,19 @@ if True:
     print(f"np.linalg.eigvals(N): {np.linalg.eigvals(N)}")
     print(f"np.linalg.matrix_norm(N, ord=2): {np.linalg.matrix_norm(N, ord=2)}")
 
+if True:
+    Z = (I-J)@L2
+    print("---------[ Z ]--------")
+    print(Z)
+    
+    print("---------[ L2 ]--------")
+    print(f"np.linalg.eigvals(L2): {np.linalg.eigvals(L2)}")
+    print(f"np.linalg.matrix_norm(L2, ord=2): {np.linalg.matrix_norm((L2), ord=2)}")
+
+    print("---------[ Z = (I-J)@L2) ]--------")
+    print(f"np.linalg.eigvals(Z): {np.linalg.eigvals(Z)}")
+    print(f"np.linalg.matrix_norm(Z, ord=2): {np.linalg.matrix_norm(Z, ord=2)}")
+
 
 if True:
     theta = 0.05
