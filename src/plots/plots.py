@@ -195,7 +195,7 @@ class BaseRunResultPlotter:
         if cost.ndim == 1: # (K,)
             _timeseries(
                 ax, cost, 
-                legend = legend or r'$\ell(z) = \sum_{i=1}^{N} \ell_i(z_i, \sigma(z))$',
+                legend = legend or r'$f(x) = \sum_{i=1}^{N} f_i(x_i, \sigma(x))$',
                 title="Cost evolution", 
                 ylabel="cost", 
                 semilogy=semilogy
@@ -206,7 +206,7 @@ class BaseRunResultPlotter:
             assert cost.shape[1] == 2, "\ell(z), Lagrangian, and ?"
             _timeseries(
                 ax, cost[:, 1], 
-                legend = legend or r'$\mathcal{L}(z,\lambda)$',
+                legend = legend or r'$\mathcal{L}(x,\lambda)$',
                 title="Cost evolution of Lagrangian", 
                 ylabel="cost", 
                 semilogy=semilogy
@@ -214,7 +214,7 @@ class BaseRunResultPlotter:
 
             _timeseries(
                 ax, cost[:, 0], 
-                legend = legend or r'$\ell(z) = \sum_{i=1}^{N} \ell_i(z_i, \sigma(z))$',
+                legend = legend or r'$f(x) = \sum_{i=1}^{N} f_i(x_i, \sigma(x))$',
                 title="Cost evolution", 
                 ylabel="cost", 
                 semilogy=semilogy
@@ -234,7 +234,7 @@ class BaseRunResultPlotter:
         
         _timeseries(
             ax, grad_norm,
-            legend = legend or r'$ ||\nabla \ell(z) ||^2 $', 
+            legend = legend or r'$ ||\nabla \ell(x) ||^2 $', 
             title="Gradient norm evolution", 
             ylabel="gradient norm", 
             semilogy=semilogy,
@@ -253,9 +253,9 @@ class BaseRunResultPlotter:
         _timeseries(
             ax, y,
             semilogy=semilogy,
-            legend = legend or r'$z$', # inside it will be added '_0, _1, ...'
+            legend = legend or r'$x$', # inside it will be added '_0, _1, ...'
             title="Agent trajectories",
-            ylabel=r'$ z_i $',
+            ylabel=r'$ x_i $',
             agents = "all",
             split_components = True,
             # component = 0,
@@ -277,9 +277,9 @@ class BaseRunResultPlotter:
         if len(sigma.shape) == 2: # (K, d)
             _timeseries(
                 ax, sigma,
-                legend = legend or r'$\sigma(z)$',
+                legend = legend or r'$\sigma(x)$',
                 semilogy = semilogy,
-                ylabel = r'$ \sigma(z) $',
+                ylabel = r'$ \sigma(x) $',
                 title ="Sigma trajectories",
                 split_components = True,
                 interpret_2d="components"
@@ -287,10 +287,10 @@ class BaseRunResultPlotter:
         if len(sigma.shape) == 3: # (K, N, d)
             _timeseries(
                 ax, sigma,
-                legend = legend or r'$ s $', # inside it will be added '_0, _1, ...'
+                legend = legend or r'$ \sigma $', # inside it will be added '_0, _1, ...'
                 semilogy=semilogy,
                 title="Sigma trajectories",
-                ylabel=r'$s_i$',
+                ylabel=r'$\sigma_i$',
                 agents = "all",
                 # component = None,
                 split_components = True,
@@ -435,7 +435,7 @@ class BaseRunResultPlotter:
         else:
             contours_proxy = None
         
-        ax.set_title("Trajectory in (z1, z2) plane with constraints")
+        ax.set_title("Trajectory in (x1, x2) plane with constraints")
         # ===== Plot constraints & unfeasible region =====
         has_constraints = isinstance(problem, ConstrainedOptimizationProblem)
         if has_constraints:
@@ -447,8 +447,8 @@ class BaseRunResultPlotter:
 
             problem.draw_constraints(ax)
 
-        ax.set_xlabel("z1")
-        ax.set_ylabel("z2")
+        ax.set_xlabel("x1")
+        ax.set_ylabel("x2")
         ax.grid(True, ls="--", alpha=0.6)
 
         pad = 0.1
@@ -634,21 +634,21 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
         
         _timeseries(
             ax, grad_L_x_norm, 
-            legend = r'$||\nabla_z \mathcal{L}(z,\lambda)||$',
+            legend = r'$||\nabla_x \mathcal{L}(x,\lambda)||$',
             title="Lagrangian Stationarity", 
-            ylabel=r'$||\nabla\mathcal{L}(z,\lambda)||$',
+            ylabel=r'$||\nabla_x\mathcal{L}(x,\lambda)||$',
             semilogy=semilogy
         )
         _timeseries(
             ax, grad_L_l_norm, 
-            legend = r'$||\nabla_\lambda \mathcal{L}(z,\lambda)||$',
+            legend = r'$||\nabla_\lambda \mathcal{L}(x,\lambda)||$',
             title="Lagrangian Stationarity", 
             ylabel=r'$||\nabla\mathcal{L}(z,\lambda)||$',
             semilogy=semilogy
         )
         _timeseries(
             ax, proj_residual_norm, 
-            legend = r'$$ z_i - \Pi_{[0,1]} [z_i - \alpha \nabla_i \mathcal{L} ] $$',
+            legend = r'$$ x_i - \Pi_{[0,1]} [x_i - \alpha \nabla_x \mathcal{L} ] $$',
             title="Lagrangian Stationarity", 
             ylabel="residual",
             semilogy=semilogy

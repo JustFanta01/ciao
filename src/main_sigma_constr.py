@@ -21,11 +21,11 @@ import numpy as np
 
 SHOW_CENTRALIZED = False
 SHOW_DISTRIBUTED = False
-SHOW_COMPARISON  = True
+SHOW_COMPARISON  = False
 
-SAVE_CENTRALIZED = False
-SAVE_DISTRIBUTED = False
-SAVE_COMPARISON  = False
+SAVE_CENTRALIZED = True
+SAVE_DISTRIBUTED = True
+SAVE_COMPARISON  = True
 
 def main():
     N = 7  # number of agents
