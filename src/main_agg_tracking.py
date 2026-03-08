@@ -17,16 +17,16 @@ from utils import graph_utils
 
 SHOW_CENTRALIZED = False
 SHOW_DISTRIBUTED = False
-SHOW_COMPARISON  = True 
+SHOW_COMPARISON  = False
 
-SAVE_CENTRALIZED = False
-SAVE_DISTRIBUTED = False
-SAVE_COMPARISON  = False
+SAVE_CENTRALIZED = True
+SAVE_DISTRIBUTED = True
+SAVE_COMPARISON  = True
 
 def main():
-    N = 2  # number of agents
+    N = 7  # number of agents
     d = 1  # dimension of the state space
-    seed = 3
+    seed = 7
     rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
@@ -225,16 +225,18 @@ def main():
             
             agents.append(agent_i)
 
-        args = {'edge_probability': 0.65, 'seed': seed}
+        args = {'edge_probability': 0.45, 'rng': rng}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
-    
+        
+        fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+        title = f"Graph and Adj Matrix"
+        fig.suptitle(title)
+        fig.canvas.manager.set_window_title(title)
+        plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
         if SHOW_DISTRIBUTED:
-            fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-            title = f"Graph and Adj Matrix"
-            fig.suptitle(title)
-            fig.canvas.manager.set_window_title(title)
-            plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
             plots.show_and_wait(fig)
+        if SAVE_DISTRIBUTED and N>2:
+            fig.savefig(f"../output/aggregative_tracking_network_{N}.png")
     
         problem = OptimizationProblem(agents, adj, seed)
         return problem

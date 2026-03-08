@@ -19,13 +19,13 @@ from utils import graph_utils
 
 import numpy as np
 
-SHOW_CENTRALIZED = True
-SHOW_DISTRIBUTED = True
-SHOW_COMPARISON  = True
+SHOW_CENTRALIZED = False
+SHOW_DISTRIBUTED = False
+SHOW_COMPARISON  = False
 
-SAVE_CENTRALIZED = False
-SAVE_DISTRIBUTED = False
-SAVE_COMPARISON  = False
+SAVE_CENTRALIZED = True
+SAVE_DISTRIBUTED = True
+SAVE_COMPARISON  = True
 
 def generate_B_b(
     # Per-agent params (shape (N,))
@@ -232,11 +232,94 @@ def generate_B_b_cloud(
 
     return B_list, b_list, b_sum
 
+def generate_B_b_from_target(
+    z_target: np.ndarray,      # shape (N,)
+    workload: np.ndarray,      # shape (N,)
+    rho: np.ndarray,           # shape (N,)
+    energy_tx: np.ndarray,     # shape (N,)
+    time_tx: np.ndarray,       # shape (N,)
+    *,
+    budget_factor: float = 1.08,   # $$ >1 \Rightarrow z_{\text{target}} \text{ is feasible} $$
+    w_workload: float = 0.50,
+    w_rho: float = 0.20,
+    w_cloud: float = 0.30,
+):
+    """
+    Build a single affine coupling constraint
+
+    $$ \sum_{i=1}^N B_i z_i \le b_{\mathrm{sum}} $$
+
+    in a way that:
+    - is interpretable,
+    - scales with N,
+    - is calibrated from z_target.
+
+    Returns
+    -------
+    B_list : list of N arrays, each shape (1,1)
+    b_list : list of N arrays, each shape (1,)
+    b_sum  : array shape (1,)
+    """
+
+    z_target  = np.asarray(z_target, dtype=float)
+    workload  = np.asarray(workload, dtype=float)
+    rho       = np.asarray(rho, dtype=float)
+    energy_tx = np.asarray(energy_tx, dtype=float)
+    time_tx   = np.asarray(time_tx, dtype=float)
+
+    N = z_target.size
+
+    # ------------------------------------------------------------
+    # 1) build a positive per-agent "resource burden"
+    # ------------------------------------------------------------
+    # $$ \ell_i^{cloud} = E_i^{tx} + T_i^{tx} $$
+    ell_cloud = energy_tx + time_tx
+
+    def normalize_positive(x):
+        x = np.asarray(x, dtype=float)
+        xmin = np.min(x)
+        xmax = np.max(x)
+        if np.isclose(xmax, xmin):
+            return np.ones_like(x)
+        # map to [0,1], then shift to [0.5, 1.5]
+        return 0.5 + (x - xmin) / (xmax - xmin)
+
+    workload_n = normalize_positive(workload)
+    rho_n      = normalize_positive(rho)
+    cloud_n    = normalize_positive(ell_cloud)
+
+    # $$ B_i > 0 $$
+    B_scalar = (
+        w_workload * workload_n
+        + w_rho      * rho_n
+        + w_cloud    * cloud_n
+    )
+
+    # safeguard
+    B_scalar = np.maximum(B_scalar, 1e-6)
+
+    # ------------------------------------------------------------
+    # 2) choose total budget from target usage
+    # ------------------------------------------------------------
+    # $$ d_{\text{target}} := \sum_i B_i z_i^{\text{target}} $$
+    demand_target = float(np.sum(B_scalar * z_target))
+
+    # $$ b_{\text{sum}} := \eta \, d_{\text{target}} $$
+    b_sum = np.array([budget_factor * demand_target], dtype=float)
+
+    # ------------------------------------------------------------
+    # 3) split equally among agents
+    # ------------------------------------------------------------
+    B_list = [np.array([[B_scalar[i]]], dtype=float) for i in range(N)]
+    b_list = [(1.0 / N) * b_sum for _ in range(N)]
+
+    return B_list, b_list, b_sum
+
 def main():
-    N = 5  # number of agents
+    N = 7  # number of agents
     m = 1  # number of affine constraints per agent, B_i is a matrix (m,d)
     d = 1  # dimension of the state space
-    seed = 3
+    seed = 7
     rng = np.random.default_rng(seed)
 
     # [ define \ell_i ] 
@@ -594,13 +677,27 @@ def main():
     memory  = rng.uniform(1,3,N)
     network = rng.uniform(1,3,N)
 
-    # B_list, b_list, b_sum = generate_B_b_full_row_rank(z_target, workload, memory, network)
+    B_list, b_list, b_sum = generate_B_b_from_target(
+        z_target=z_target,
+        workload=workload,
+        rho=rho,
+        energy_tx=energy_tx,
+        time_tx=time_tx,
+        budget_factor=0.8,   # try 1.05, 1.08, 1.10
+    )
+
+    print("B coefficients:", [Bi.item() for Bi in B_list])
+    print("b_sum:", b_sum)
+    print("target constraint value:",
+        sum(B_list[i].item() * z_target[i] for i in range(N)))
+    print("target feasible:",
+        sum(B_list[i].item() * z_target[i] for i in range(N)) <= b_sum.item())
 
     # [ simple constraints ]
-    B_list = np.ones((N,m,d))
-    B_list[0] = np.array([5])
-    B_list[1] = np.array([3])
-    b_list = np.ones((N,m)) * 3 / N
+    # B_list = np.ones((N,m,d))
+    # B_list[0] = np.array([5])
+    # B_list[1] = np.array([3])
+    # b_list = np.ones((N,m))/N
 
     def setup_problem():
         agents = []
@@ -621,16 +718,18 @@ def main():
             
             agents.append(agent_i)
 
-        args = {'edge_probability': 0.45, 'seed': seed}
+        args = {'edge_probability': 0.45, 'rng': rng}
         graph, adj = graph_utils.create_graph_with_metropolis_hastings_weights(N, graph_utils.GraphType.ERDOS_RENYI, args)
     
+        fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
+        title = f"Graph and Adj Matrix"
+        fig.suptitle(title)
+        fig.canvas.manager.set_window_title(title)
+        plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
         if SHOW_DISTRIBUTED:
-            fig, axs = plt.subplots(figsize=(7, 4), nrows=1, ncols=2)
-            title = f"Graph and Adj Matrix"
-            fig.suptitle(title)
-            fig.canvas.manager.set_window_title(title)
-            plots.show_graph_and_adj_matrix(fig, axs, graph, adj)
             plots.show_and_wait(fig)
+        if SAVE_DISTRIBUTED and N>2:
+            fig.savefig(f"../output/affine_constraints_network_{N}.png")
     
         problem = AffineCouplingProblem(agents, adj, seed)
         return problem
@@ -645,10 +744,10 @@ def main():
         problem = setup_problem()
         while not problem.check():
             print("unfeasible init...")
+            search_zone *= 0.75
             init_state = rng.uniform(0, search_zone, size=(N, d))
             print(f"init_state: {init_state}")
             problem = setup_problem()
-            search_zone *= 0.5
             iteration += 1
 
         centralized = AugmentedPrimalDualGradientDescent(problem)
@@ -657,7 +756,7 @@ def main():
             "stepsize": 0.01,
             "seed": seed,
             "rho": 3,
-            "dual_stepsize": N * 0.01
+            "dual_stepsize": 0.05
         }
         algo_params = AugmentedPrimalDualGradientDescent.AlgorithmParams(**args)
         result_centralized = centralized.run(algo_params)
@@ -758,7 +857,7 @@ def main():
         "max_iter": 2000,
         "stepsize": 0.01,
         "seed": seed,
-        "beta":  0.01,
+        "beta":  0.05,
         "gamma": 0.05
     }
     algo_params = DuMeng.AlgorithmParams(**args)
@@ -776,7 +875,8 @@ def main():
         \
         .plot_agents_trajectories()\
         .plot_sigma_trajectory()\
-        .plot_aux(["aa_traj", "yy_traj"], semilogy=False)\
+        .plot_aux(["aa_traj", "nn_traj"], semilogy=False)\
+        \
         .plot_lagr_stationarity()\
         .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
         .plot_kkt_conditions()

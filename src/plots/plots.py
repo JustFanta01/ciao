@@ -42,6 +42,9 @@ def plot_filename_from_result(
     ext: str = "png",
 ) -> str:
     parts = run_result.algorithm_module.split(".")
+    
+    # TrajectoryCollector("zz", K, (N,d))
+    K, N, d = run_result.zz_traj.shape
 
     if parts[0] == "algorithms":
         core = parts[1:]   # family, mode, AlgorithmName
@@ -51,7 +54,7 @@ def plot_filename_from_result(
 
     cost_fn_name = run_result.cost_fn_name[:10]
 
-    return str(Path(img_root) / f"{prefix}__{cost_fn_name}__{tag}.{ext}")
+    return str(Path(img_root) / f"{prefix}__{cost_fn_name}__{tag}__{N}.{ext}")
 
 def plot_filename_comparison_from_results(
     results,
@@ -60,6 +63,7 @@ def plot_filename_comparison_from_results(
     ext="png",
 ) -> str:
     parts = results[0].algorithm_module.split(".")
+    K, N, d = results[0].zz_traj.shape
     if parts[0] == "algorithms":
         family = parts[1]
     else:
@@ -67,7 +71,7 @@ def plot_filename_comparison_from_results(
 
     cost_fn_name = results[0].cost_fn_name[:10]
 
-    return str(Path(img_root) / f"{family}__comp__{cost_fn_name}__{tag}.{ext}")
+    return str(Path(img_root) / f"{family}__comp__{cost_fn_name}__{tag}__{N}.{ext}")
 
 
 @dataclass
@@ -294,6 +298,7 @@ class BaseRunResultPlotter:
                 # aggregate_agents = "quantiles",
                 # sample_agents_k = None,
             )
+
     def _render_sigma_traj(self, ax, *, semilogy: bool, legend: Optional[str]):
         BaseRunResultPlotter._render_sigma_traj_from_result(ax, self.result, semilogy=semilogy, legend=legend)
 
@@ -563,7 +568,6 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
         self._tasks.append(PlotTask("kkt_cond", {"semilogy": semilogy}))
         return self
 
-
     def plot_consensus_error(self, keys : list[str], semilogy: bool = True, legend: Optional[str] = None):
         self._tasks.append(PlotTask("consensus_error", {"keys": keys, "semilogy": semilogy, "legend": legend}))
         return self
@@ -610,20 +614,23 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
 
     @staticmethod
     def _render_lagr_stationarity_from_result(ax, result, *, semilogy):
-        if "grad_L_x_traj" not in result.aux or "grad_L_l_traj" not in result.aux:
+        if "grad_L_x_traj" not in result.aux or "grad_L_l_traj" not in result.aux or "proj_residual_traj" not in result.aux:
             ax.set_title("Stationarity (missing in aux)")
             return
 
         grad_L_x = result.aux["grad_L_x_traj"]  # shape (K, n_tot)
         grad_L_l = result.aux["grad_L_l_traj"]  # shape (K, m)
+        proj_residual = result.aux["proj_residual_traj"]  # shape (K, N, d)
 
         grad_L_x_dim = len(grad_L_x.shape)
         grad_L_l_dim = len(grad_L_l.shape)
+        proj_residual_dim = len(proj_residual.shape)
         # the norm of the whole matrix / vector present at each iteration
         # so if grad.shape = (K, N, d1, d2, d3)
         # grad_norm[k] is the norm of the (N, d1, d2, d3) matrix at grad[k]
         grad_L_x_norm = np.linalg.norm(grad_L_x, axis=tuple(range(1, grad_L_x_dim)))
         grad_L_l_norm = np.linalg.norm(grad_L_l, axis=tuple(range(1, grad_L_l_dim)))
+        proj_residual_norm = np.linalg.norm(proj_residual, axis=tuple(range(1, proj_residual_dim)))
         
         _timeseries(
             ax, grad_L_x_norm, 
@@ -639,7 +646,13 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
             ylabel=r'$||\nabla\mathcal{L}(z,\lambda)||$',
             semilogy=semilogy
         )
-    
+        _timeseries(
+            ax, proj_residual_norm, 
+            legend = r'$$ z_i - \Pi_{[0,1]} [z_i - \alpha \nabla_i \mathcal{L} ] $$',
+            title="Lagrangian Stationarity", 
+            ylabel="residual",
+            semilogy=semilogy
+        )
 
     def _render_kkt_cond(self, ax, *, semilogy: bool):
         ConstrainedRunResultPlotter._render_kkt_cond_from_result(ax, self.result, semilogy=semilogy)

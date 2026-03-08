@@ -68,6 +68,7 @@ class CIAO(Algorithm):
         collector_grad_ell = TrajectoryCollector("total gradient of l(x)", K, (N,d))
         collector_grad_L_z = TrajectoryCollector("gradient of L(z,l) wrt. z", K, (N,d))
         collector_grad_L_l = TrajectoryCollector("gradient of L(z,l) wrt. l", K, (m,))
+        collector_projected_stationarity = TrajectoryCollector("Projected_stationarity_traj", K, (N,d))
 
         collector_kkt = TrajectoryCollector("kkt", K, (3,))
 
@@ -198,10 +199,14 @@ class CIAO(Algorithm):
                 total_grad_L_in_z[i] = grad_L_in_z # (N,d)
 
             # global primal residual: r = A x - b
-            zz_k_flat = np.array([ag["zz"] for ag in self.problem.agents]).reshape((N*d,))
+            zz_k = np.array([ag["zz"] for ag in self.problem.agents])
+            zz_k_flat = zz_k.reshape((N*d,))
             
             r = self.problem.sigma() - c # (m,)
             total_grad_L_in_l = r
+
+            # $$ z_i - \Pi_{[0,1]}\left(z_i - \alpha \nabla_z \mathcal L(z,\lambda)\right) $$
+            proj_residual = zz_k - zz_k_plus_1
             
             # stationarity: ||∇f(x) + A^T λ||
             ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
@@ -240,7 +245,8 @@ class CIAO(Algorithm):
             # -- grads
             collector_grad_ell.log(k, total_grad_ell)
             collector_grad_L_z.log(k, total_grad_L_in_z)
-            collector_grad_L_l.log(k, total_grad_L_in_l)   
+            collector_grad_L_l.log(k, total_grad_L_in_l)
+            collector_projected_stationarity.log(k, proj_residual) 
 
             # [ write back ]
             for i, agent_i in enumerate(self.problem.agents):
@@ -270,6 +276,7 @@ class CIAO(Algorithm):
                 "lambda_traj": collector_ll.get(),
                 "grad_L_x_traj": collector_grad_L_z.get(),                
                 "grad_L_l_traj": collector_grad_L_l.get(),
+                "proj_residual_traj": collector_projected_stationarity.get(),
                 "kkt_traj": collector_kkt.get(),
             }
         )

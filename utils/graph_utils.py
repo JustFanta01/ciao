@@ -47,13 +47,13 @@ def create_graph_with_metropolis_hastings_weights(NN, graph_type, args={}):
     
     if graph_type == GraphType.ERDOS_RENYI:
         p_er = args['edge_probability']
-        seed = args['seed']
+        rng = args['rng']
         max_iterations = 1000
         iterations = 0
         while True:
             if iterations >= max_iterations:
                 raise RuntimeError("Reached max iterations")
-            G = nx.erdos_renyi_graph(NN, p_er, seed)
+            G = nx.erdos_renyi_graph(NN, p_er, seed=rng)
             Adj = nx.adjacency_matrix(G).toarray()
             is_strongly_connected = np.all(np.linalg.matrix_power(Adj + np.eye(NN), NN) > 0)
             

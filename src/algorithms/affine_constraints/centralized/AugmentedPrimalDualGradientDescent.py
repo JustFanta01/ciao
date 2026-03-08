@@ -100,6 +100,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
         
         collector_grad_L_x = TrajectoryCollector("gradient of L(x,l) wrt. x", K, (N*d,))
         collector_grad_L_l = TrajectoryCollector("gradient of L(x,l) wrt. l", K, (m,))
+        collector_projected_stationarity = TrajectoryCollector("Projected_stationarity_traj", K, (N,d))
 
         collector_kkt = TrajectoryCollector("kkt", K, (3,))
 
@@ -199,6 +200,9 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
             # complementarity: max |λ_j * r_j| (max to highlight the "less satisfied constraint")
             complementarity = np.max(np.abs(self.lamda * r))
 
+            # $$ r_i = z_i - \Pi_{[0,1]}\left(z_i - \alpha \nabla_i \mathcal L\right) $$
+            proj_residual = (zz_k - zz_k_plus_1).reshape(N, d)
+
             # ------[ collector ]------
             collector_zz.log(k, np.array([ag["zz"] for ag in self.problem.agents]))
             collector_cost.log(k, cost)
@@ -208,6 +212,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
             collector_sigma.log(k, sigma)
             collector_grad_L_x.log(k, total_grad_L_in_x)
             collector_grad_L_l.log(k, total_grad_L_in_lamda)
+            collector_projected_stationarity.log(k, proj_residual)
             collector_kkt.log(k, np.array([stationarity, primal_violation, complementarity], dtype=float))
             
             # ------[ writeback ]------
@@ -231,6 +236,7 @@ class AugmentedPrimalDualGradientDescent(Algorithm):
                 "lambda_traj": collector_lamda.get(),
                 "grad_L_x_traj": collector_grad_L_x.get(),
                 "grad_L_l_traj": collector_grad_L_l.get(),
+                "proj_residual_traj": collector_projected_stationarity.get(),
                 "kkt_traj": collector_kkt.get(),
             }
         )
