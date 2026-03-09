@@ -62,7 +62,8 @@ class DuMeng2(Algorithm):
         collector_grad_ell = TrajectoryCollector("total gradient of l(x)", K, (N,d))
         collector_grad_L_z = TrajectoryCollector("gradient of L(z,l) wrt. z", K, (N,d))
         collector_grad_L_l = TrajectoryCollector("gradient of L(z,l) wrt. l", K, (m,))
-        collector_projected_stationarity = TrajectoryCollector("Projected_stationarity_traj", K, (N,d))
+        collector_projected_stationarity_primal = TrajectoryCollector("Projected_stationarity_traj_primal", K, (N,d))
+        collector_projected_stationarity_dual = TrajectoryCollector("Projected_stationarity_traj_dual", K, (N,m))
 
         collector_kkt = TrajectoryCollector("kkt", K, (3,))
 
@@ -192,15 +193,19 @@ class DuMeng2(Algorithm):
             # global primal residual: r = A x - b
             zz_k = np.array([ag["zz"] for ag in self.problem.agents])
             zz_k_flat = zz_k.reshape((N*d,))
+            ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
+            ll_k_flat = ll_k.reshape((N*m,))
+
             r = BB @ zz_k_flat - bb # (m,)
             total_grad_L_in_l = r
 
             # $$ z_i - \Pi_{[0,1]}\left(z_i - \alpha \nabla_z \mathcal L(z,\lambda)\right) $$
-            proj_residual = zz_k - zz_k_plus_1
+            proj_residual_primal = zz_k - zz_k_plus_1
             
+            # $$ \lambda^k - \Pi_{\mathbb{R}_m^+}\left(\lambda^k + \nabla_\lambda \mathcal L(x,\lambda)\right) $$
+            proj_residual_dual = ll_k - np.maximum(ll_k + r, 0.0)
+
             # stationarity: ||∇f(x) + A^T λ||
-            ll_k = np.array([ag["ll"] for ag in self.problem.agents])       # (N, m)
-            ll_k_flat = ll_k.reshape((N*m,))
             ll_bar = np.mean(ll_k, axis=0) # TODO: la media?
             # BB.T @ ll_bar
             # eq (10a): $$ \mathbf{0} = \nabla_1 f(w^*, z^*) + \nabla h(w^*)\mu^* + \Lambda^T\lambda^* $$
@@ -232,7 +237,8 @@ class DuMeng2(Algorithm):
             collector_grad_ell.log(k, total_grad_ell)
             collector_grad_L_z.log(k, total_grad_L_in_z)
             collector_grad_L_l.log(k, total_grad_L_in_l)
-            collector_projected_stationarity.log(k, proj_residual)
+            collector_projected_stationarity_primal.log(k, proj_residual_primal)
+            collector_projected_stationarity_dual.log(k, proj_residual_dual)
 
             # [ write back ]
             for i, agent_i in enumerate(self.problem.agents):
@@ -257,12 +263,13 @@ class DuMeng2(Algorithm):
                 # "ss_traj": collector_ss.get(),
                 "sigma_traj": collector_ss.get(),
                 "vv_traj": collector_vv.get(),
-                "aa_traj": collector_aa.get(), 
+                "qq_traj": collector_aa.get(), # In Thesis is qq, notation clash with 'a' of adjacency matrix.
                 "nn_traj": collector_nn.get(),
                 "lambda_traj": collector_ll.get(),
                 "grad_L_x_traj": collector_grad_L_z.get(),
                 "grad_L_l_traj": collector_grad_L_l.get(),
-                "proj_residual_traj": collector_projected_stationarity.get(),
+                "proj_residual_traj_primal": collector_projected_stationarity_primal.get(),
+                "proj_residual_traj_dual": collector_projected_stationarity_dual.get(),
                 "kkt_traj": collector_kkt.get(),
             }
         )

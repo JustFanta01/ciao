@@ -875,7 +875,7 @@ def main():
         \
         .plot_agents_trajectories()\
         .plot_sigma_trajectory()\
-        .plot_aux(["aa_traj", "nn_traj"], semilogy=False)\
+        .plot_aux(["qq_traj", "nn_traj"], semilogy=False)\
         \
         .plot_lagr_stationarity()\
         .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\

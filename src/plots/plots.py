@@ -204,13 +204,13 @@ class BaseRunResultPlotter:
 
         if cost.ndim == 2: # (K, costs)
             assert cost.shape[1] == 2, "\ell(z), Lagrangian, and ?"
-            _timeseries(
-                ax, cost[:, 1], 
-                legend = legend or r'$\mathcal{L}(x,\lambda)$',
-                title="Cost evolution of Lagrangian", 
-                ylabel="cost", 
-                semilogy=semilogy
-            )
+            # _timeseries(
+            #     ax, cost[:, 1], 
+            #     legend = legend or r'$\mathcal{L}(x,\lambda)$',
+            #     title="Cost evolution of Lagrangian", 
+            #     ylabel="cost", 
+            #     semilogy=semilogy
+            # )
 
             _timeseries(
                 ax, cost[:, 0], 
@@ -234,7 +234,7 @@ class BaseRunResultPlotter:
         
         _timeseries(
             ax, grad_norm,
-            legend = legend or r'$ ||\nabla \ell(x) ||^2 $', 
+            legend = legend or r'$ ||\nabla f(x) ||^2 $', 
             title="Gradient norm evolution", 
             ylabel="gradient norm", 
             semilogy=semilogy,
@@ -614,23 +614,35 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
 
     @staticmethod
     def _render_lagr_stationarity_from_result(ax, result, *, semilogy):
-        if "grad_L_x_traj" not in result.aux or "grad_L_l_traj" not in result.aux or "proj_residual_traj" not in result.aux:
-            ax.set_title("Stationarity (missing in aux)")
+        if "grad_L_x_traj" not in result.aux:
+            ax.set_title("grad_L_x_traj (missing in aux)")
+            return
+        if "grad_L_l_traj" not in result.aux:
+            ax.set_title("grad_L_l_traj (missing in aux)")
+            return
+        if "proj_residual_traj_primal" not in result.aux:
+            ax.set_title("proj_residual_traj_primal (missing in aux)")
+            return
+        if "proj_residual_traj_dual" not in result.aux:
+            ax.set_title("proj_residual_traj_dual (missing in aux)")
             return
 
         grad_L_x = result.aux["grad_L_x_traj"]  # shape (K, n_tot)
         grad_L_l = result.aux["grad_L_l_traj"]  # shape (K, m)
-        proj_residual = result.aux["proj_residual_traj"]  # shape (K, N, d)
+        proj_residual_primal = result.aux["proj_residual_traj_primal"]  # shape (K, N, d)
+        proj_residual_dual = result.aux["proj_residual_traj_dual"]  # shape (K, N, m) or (K, m)
 
         grad_L_x_dim = len(grad_L_x.shape)
         grad_L_l_dim = len(grad_L_l.shape)
-        proj_residual_dim = len(proj_residual.shape)
+        proj_residual_dim_primal = len(proj_residual_primal.shape)
+        proj_residual_dim_dual = len(proj_residual_dual.shape)
         # the norm of the whole matrix / vector present at each iteration
         # so if grad.shape = (K, N, d1, d2, d3)
         # grad_norm[k] is the norm of the (N, d1, d2, d3) matrix at grad[k]
         grad_L_x_norm = np.linalg.norm(grad_L_x, axis=tuple(range(1, grad_L_x_dim)))
         grad_L_l_norm = np.linalg.norm(grad_L_l, axis=tuple(range(1, grad_L_l_dim)))
-        proj_residual_norm = np.linalg.norm(proj_residual, axis=tuple(range(1, proj_residual_dim)))
+        proj_residual_norm_primal = np.linalg.norm(proj_residual_primal, axis=tuple(range(1, proj_residual_dim_primal)))
+        proj_residual_norm_dual = np.linalg.norm(proj_residual_dual, axis=tuple(range(1, proj_residual_dim_dual)))
         
         _timeseries(
             ax, grad_L_x_norm, 
@@ -647,8 +659,16 @@ class ConstrainedRunResultPlotter(BaseRunResultPlotter):
             semilogy=semilogy
         )
         _timeseries(
-            ax, proj_residual_norm, 
+            ax, proj_residual_norm_primal, 
             legend = r'$$ x_i - \Pi_{[0,1]} [x_i - \alpha \nabla_x \mathcal{L} ] $$',
+            title="Lagrangian Stationarity", 
+            ylabel="residual",
+            semilogy=semilogy
+        )
+
+        _timeseries(
+            ax, proj_residual_norm_dual, 
+            legend = r'$$\lambda^k - \Pi_{\mathbb{R}_m^+}\left(\lambda^k + \nabla_\lambda \mathcal{L}(x,\lambda)\right)$$',
             title="Lagrangian Stationarity", 
             ylabel="residual",
             semilogy=semilogy

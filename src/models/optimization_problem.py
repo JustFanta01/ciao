@@ -205,12 +205,12 @@ class AffineCouplingProblem(ConstrainedOptimizationProblem):
             
             if abs(a2) > 1e-12:
                 y_line = (b - a1 * xs) / a2
-                ax.plot(xs, y_line, 'k--', label=f"{a1:.2f}·z1 + {a2:.2f}·z2 = {b:.2f}")
+                ax.plot(xs, y_line, 'k--', label=f"{a1:.2f}·x1 + {a2:.2f}·x2 = {b:.2f}")
             else:
                 if abs(a1) < 1e-12:
                     continue
                 x_line = np.full_like(ys, b / a1)
-                ax.plot(x_line, ys, 'k--', label=f"{a1:.2f}·z1 = {b:.2f}")
+                ax.plot(x_line, ys, 'k--', label=f"{a1:.2f}·x1 = {b:.2f}")
 
 class ConstrainedSigmaProblem(ConstrainedOptimizationProblem):
     def __init__(self, agents:list[Agent], adj:np.ndarray, seed : int, c : np.ndarray):

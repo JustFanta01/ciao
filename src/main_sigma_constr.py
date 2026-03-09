@@ -317,7 +317,7 @@ def main():
         "stepsize": 0.01,
         "beta": 0.01,
         "gamma": 0.01,
-        "theta": 0.0000001
+        "theta": 0.0001
     }
     algo_params = CIAO.AlgorithmParams(**args)
     result_distributed = distributed.run(algo_params)
@@ -336,7 +336,7 @@ def main():
         \
         .plot_agents_trajectories()\
         .plot_sigma_trajectory()\
-        .plot_aux(["aa_traj", "nn_traj"], semilogy=False)\
+        .plot_aux(["qq_traj", "nn_traj"], semilogy=False)\
         \
         .plot_lagr_stationarity()\
         .plot_consensus_error(["lambda_traj", "sigma_traj", "vv_traj"])\
@@ -358,6 +358,23 @@ def main():
             plotter.save(filename)
     # animation.animate_offloading_with_mean(result, problem.agents, interval=80)
 
+    # -----------------------
+    # |     DISTRIBUTED     |
+    # -----------------------
+    problem = setup_problem()
+    distributed = CIAO(problem)
+    args = {
+        "seed": seed,
+        "max_iter": 2000,
+        "stepsize": 0.01,
+        "beta": 0.01,
+        "gamma": 0.01,
+        "theta": 0.000001
+    }
+    algo_params = CIAO.AlgorithmParams(**args)
+    result_distributed_theta = distributed.run(algo_params)
+
+    result_distributed_theta.summary()
 
     # -----------------------
     # |     COMPARISON      |
@@ -397,6 +414,17 @@ def main():
             horizontal_plotter.show()
         if SAVE_COMPARISON:
             horizontal_plotter.save(filename)
+
+    results = [result_centralized, result_distributed]
+    horizontal_plotter = plots.ComparisonConstrainedRunResultPlotter(problem, [result_distributed, result_distributed_theta], layout="horizontal")
+    filename = plots.plot_filename_comparison_from_results(results, "theta")
+    horizontal_plotter\
+        .clear()\
+        .plot_lagr_stationarity()
+    if SHOW_COMPARISON:
+        horizontal_plotter.show()
+    if SAVE_COMPARISON:
+        horizontal_plotter.save(filename)
     
 
 if __name__ == "__main__":

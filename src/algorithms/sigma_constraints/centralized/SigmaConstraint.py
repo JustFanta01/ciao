@@ -42,7 +42,8 @@ class SigmaConstraint(Algorithm):
         
         collector_grad_L_x = TrajectoryCollector("gradient of L(x,l) wrt. x", K, (N,d))
         collector_grad_L_l = TrajectoryCollector("gradient of L(x,l) wrt. l", K, m)
-        collector_projected_stationarity = TrajectoryCollector("Projected_stationarity_traj", K, (N,d))
+        collector_projected_stationarity_primal = TrajectoryCollector("Projected_stationarity_traj_primal", K, (N,d))
+        collector_projected_stationarity_dual = TrajectoryCollector("Projected_stationarity_traj_dual", K, (m,))
         
         collector_kkt = TrajectoryCollector("kkt", K, 3)
         collector_sigma = TrajectoryCollector("sigma", K, d)
@@ -116,7 +117,14 @@ class SigmaConstraint(Algorithm):
             complementarity = np.max(np.abs(self.lamda * violation))
             
             # $$ r_i = z_i - \Pi_{[0,1]}\left(z_i - \alpha \nabla_i \mathcal L\right) $$
-            proj_residual = (zz_k - zz_k_plus_1).reshape(N, d)
+            proj_residual_primal = (zz_k - zz_k_plus_1).reshape(N, d)
+
+            
+            # $$ \lambda^k - \Pi_{\mathbb{R}_m^+}\left(\lambda^k + \nabla_\lambda \mathcal L(x,\lambda)\right) $$            
+            
+            proj_dual = np.maximum(self.lamda + violation, 0.0)
+            proj_residual_dual = self.lamda - proj_dual
+
 
             # ------[ collector ]------
             collector_zz.log(k, zz_k)
@@ -126,7 +134,8 @@ class SigmaConstraint(Algorithm):
             collector_sigma.log(k, sigma)
             collector_grad_L_x.log(k, total_grad_L_in_x)
             collector_grad_L_l.log(k, total_grad_L_in_lamda)
-            collector_projected_stationarity.log(k, proj_residual)
+            collector_projected_stationarity_primal.log(k, proj_residual_primal)
+            collector_projected_stationarity_dual.log(k, proj_residual_dual)
             collector_kkt.log(k, np.array([stationarity, primal_violation, complementarity], dtype=float))
             
             # ------[ writeback ]------
@@ -147,7 +156,8 @@ class SigmaConstraint(Algorithm):
                 "lambda_traj": collector_lamda.get(),
                 "grad_L_x_traj": collector_grad_L_x.get(),
                 "grad_L_l_traj": collector_grad_L_l.get(),
-                "proj_residual_traj": collector_projected_stationarity.get(),
+                "proj_residual_traj_primal": collector_projected_stationarity_primal.get(),
+                "proj_residual_traj_dual": collector_projected_stationarity_dual.get(),
                 "kkt_traj": collector_kkt.get(),
             }
         )
